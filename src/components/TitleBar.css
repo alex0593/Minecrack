@@ -1,0 +1,80 @@
+/* TitleBar.css */
+.titlebar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border);
+  padding: 0 var(--gap-md);
+  gap: var(--gap-md);
+  -webkit-app-region: drag;
+  height: 38px;
+  z-index: 50;
+}
+
+.titlebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-logo-icon {
+  width: 20px;
+  height: 20px;
+  background: var(--accent);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.titlebar-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+}
+
+.titlebar-name span {
+  color: var(--accent);
+}
+
+.titlebar-drag-area {
+  flex: 1;
+  height: 100%;
+}
+
+.titlebar-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-btn {
+  width: 28px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: all var(--transition);
+  font-family: var(--font-sans);
+}
+
+.titlebar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.titlebar-btn.close:hover {
+  background: #c0392b;
+  color: #fff;
+}

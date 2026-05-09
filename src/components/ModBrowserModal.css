@@ -1,0 +1,356 @@
+/* ── Overlay ───────────────────────────────────────────────── */
+.modbrowser-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modbrowser-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 960px;
+  max-width: 96vw;
+  height: 680px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+.modbrowser-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modbrowser-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition);
+}
+.modal-close:hover { color: var(--text-primary); }
+
+/* ── Filtros ───────────────────────────────────────────────── */
+.modbrowser-filters {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modbrowser-search {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 7px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.modbrowser-search:focus { border-color: var(--accent); }
+
+.modbrowser-filter-input {
+  width: 110px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 7px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.modbrowser-select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 7px 10px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  min-width: 130px;
+}
+
+/* ── Body (lista + detalle) ────────────────────────────────── */
+.modbrowser-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Lista de mods ─────────────────────────────────────────── */
+.modbrowser-list {
+  width: 340px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modbrowser-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 8px 8px;
+}
+
+.modbrowser-loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 16px;
+  font-size: 13px;
+}
+
+/* ── Tarjeta de mod ────────────────────────────────────────── */
+.modbrowser-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.modbrowser-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.modbrowser-card.selected {
+  background: var(--bg-elevated);
+  border-color: var(--border-accent);
+}
+
+.modbrowser-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+}
+
+.modbrowser-card-info { flex: 1; min-width: 0; }
+
+.modbrowser-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modbrowser-card-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.modbrowser-card-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ── Panel de detalle ──────────────────────────────────────── */
+.modbrowser-detail-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.modbrowser-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.modbrowser-detail-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.modbrowser-detail-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.modbrowser-detail h2 { font-size: 16px; margin: 0 0 4px; }
+
+.modbrowser-detail-by {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.modbrowser-detail-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.modbrowser-detail-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.modbrowser-detail-section {
+  margin-bottom: 14px;
+}
+
+.modbrowser-detail-section label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.modbrowser-no-versions {
+  font-size: 12px;
+  color: var(--amber);
+  background: rgba(255,183,77,0.08);
+  border: 1px solid rgba(255,183,77,0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.modbrowser-detail-file {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.modbrowser-deps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modbrowser-dep-item {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+}
+
+/* ── Indicadores de compatibilidad ────────────────────────── */
+.modbrowser-compat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.modbrowser-compat-ok {
+  color: #4caf50;
+  padding: 5px 8px;
+  background: rgba(76, 175, 80, 0.08);
+  border: 1px solid rgba(76, 175, 80, 0.2);
+  border-radius: 5px;
+}
+
+.modbrowser-compat-error {
+  color: #ef9a9a;
+  padding: 5px 8px;
+  background: rgba(239, 83, 80, 0.08);
+  border: 1px solid rgba(239, 83, 80, 0.2);
+  border-radius: 5px;
+}
+
+.modbrowser-compat-warn {
+  color: #ffcc80;
+  padding: 5px 8px;
+  background: rgba(255, 183, 77, 0.08);
+  border: 1px solid rgba(255, 183, 77, 0.2);
+  border-radius: 5px;
+}
+
+/* ── Barra de progreso ─────────────────────────────────────── */
+.modbrowser-progress {
+  margin-top: 16px;
+}
+
+.modbrowser-progress-bar {
+  height: 5px;
+  background: var(--bg-elevated);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.modbrowser-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.2s ease;
+}
+
+.modbrowser-progress-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

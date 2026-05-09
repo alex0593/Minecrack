@@ -1,0 +1,108 @@
+/* DownloadOverlay.css */
+.dl-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.dl-modal {
+  background: var(--bg-modal);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--gap-xl);
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+
+.dl-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: var(--gap-lg);
+}
+
+.dl-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--accent-glow);
+  border: 1px solid var(--border-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.dl-title  { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.dl-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* Phase badges */
+.dl-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.dl-phase-init      { background: rgba(79,195,247,0.1); color: var(--blue); }
+.dl-phase-libraries { background: rgba(179,157,219,0.1); color: var(--purple); }
+.dl-phase-assets    { background: rgba(255,183,77,0.1); color: var(--amber); }
+.dl-phase-done      { background: rgba(0,230,118,0.1); color: var(--accent); }
+
+/* Progress */
+.dl-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.dl-stats-count { color: var(--text-primary); font-weight: 600; }
+
+.dl-progress-wrap {
+  margin-bottom: 14px;
+}
+
+.dl-current-file {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 8px;
+  height: 16px;
+}
+
+/* Errors */
+.dl-errors {
+  background: rgba(239,83,80,0.06);
+  border: 1px solid rgba(239,83,80,0.15);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--red);
+  max-height: 80px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+}
+
+.dl-done-icon {
+  font-size: 40px;
+  text-align: center;
+  margin: 12px 0;
+  animation: slideUp 0.3s ease;
+}

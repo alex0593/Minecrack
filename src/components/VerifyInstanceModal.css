@@ -1,0 +1,27 @@
+.verify-modal {
+  min-width: 480px;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.verify-modal .modal-content {
+  overflow-y: auto;
+}
+
+.verify-modal h4 {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .verify-modal {
+    min-width: 90vw;
+    max-width: 90vw;
+  }
+}

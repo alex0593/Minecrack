@@ -1,0 +1,212 @@
+.isettings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.isettings-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 480px;
+  max-width: 96vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.isettings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.isettings-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.isettings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.isettings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Field ─────────────────────────────────────── */
+.isettings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.isettings-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.isettings-value-badge {
+  background: var(--accent);
+  color: #000;
+  border-radius: 99px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.isettings-input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.isettings-input:focus { border-color: var(--accent); }
+
+.isettings-textarea {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  resize: vertical;
+  min-height: 70px;
+  transition: border-color var(--transition);
+}
+.isettings-textarea:focus { border-color: var(--accent); }
+
+.isettings-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Slider ────────────────────────────────────── */
+.isettings-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  background: var(--bg-elevated);
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+}
+.isettings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg-base);
+}
+
+.isettings-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.isettings-preset {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.isettings-preset:hover { border-color: var(--accent); color: var(--text-primary); }
+.isettings-preset.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+/* ── Info row ──────────────────────────────────── */
+.isettings-info-row {
+  display: flex;
+  gap: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+}
+
+.isettings-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.isettings-info-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.isettings-info-val {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ── Danger zone ───────────────────────────────── */
+.isettings-danger-zone {
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  background: rgba(239,68,68,0.05);
+}
+
+.isettings-danger-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.isettings-confirm-delete {
+  font-size: 13px;
+  color: var(--text-secondary);
+}

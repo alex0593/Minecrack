@@ -1,0 +1,9 @@
+/* App Layout */
+.app-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: 38px 1fr;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}

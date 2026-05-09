@@ -27,6 +27,15 @@ const initialState = {
   gameInstanceId: null,
   gameLogs: [],
 
+  // Configuración global
+  config: {
+    setupCompleted: false,
+    javaPath: null,
+    gameDir: null,
+    theme: 'dark',
+  },
+  showSetupWizard: false,
+
   // Error global (para mostrar en modal copiable)
   errorMessage: null,
 
@@ -36,6 +45,14 @@ const initialState = {
 
 function reducer(state, action) {
   switch (action.type) {
+    case 'SET_CONFIG':
+      return { ...state, config: action.payload };
+
+    case 'UPDATE_CONFIG':
+      return { ...state, config: { ...state.config, ...action.payload } };
+
+    case 'SET_SHOW_WIZARD':
+      return { ...state, showSetupWizard: action.payload };
     case 'SET_INSTANCES':
       return { ...state, instances: action.payload };
 

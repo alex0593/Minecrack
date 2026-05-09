@@ -12,6 +12,7 @@ import DownloadOverlay   from './components/DownloadOverlay';
 import ModBrowserModal       from './components/ModBrowserModal';
 import InstanceSettingsModal from './components/InstanceSettingsModal';
 import VerifyInstanceModal   from './components/VerifyInstanceModal';
+import SetupWizard           from './components/SetupWizard';
 
 function ErrorModal() {
   const { state, dispatch } = useStore();
@@ -158,8 +159,14 @@ function JavaDownloadOverlay() {
 }
 
 function AppShell() {
+  const { state } = useStore();
   useGameLauncher();
   useInstancePersistence();
+
+  if (state.showSetupWizard) {
+    return <SetupWizard />;
+  }
+
   return (
     <div className="app-layout">
       <TitleBar />

@@ -215,6 +215,8 @@ function mockCommand(command, _args) {
       return Promise.resolve([]);
     case 'extract_zip':
       return Promise.resolve();
+    case 'open_dialog':
+      return Promise.resolve('/mock/path');
     default:
       return Promise.reject(new Error(`Comando "${command}" no reconocido`));
   }

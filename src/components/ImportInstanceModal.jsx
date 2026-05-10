@@ -49,9 +49,11 @@ export default function ImportInstanceModal({ onClose }) {
       console.log('[ImportInstanceModal] Transitioned to preview step');
     } catch (err) {
       console.error('[ImportInstanceModal] Error in handleSelectFolder:', err);
+      const errorMessage = err?.message || (typeof err === 'string' ? err : 'Error desconocido');
+      const errorDetails = err?.stack || (typeof err === 'string' ? '' : JSON.stringify(err));
       setError({
-        message: `Error inspeccionar carpeta: ${err.message}`,
-        details: err.stack || ''
+        message: `Error inspeccionar carpeta: ${errorMessage}`,
+        details: errorDetails
       });
       setStep('error');
     }
@@ -91,9 +93,11 @@ export default function ImportInstanceModal({ onClose }) {
       console.log('[ImportInstanceModal] Transitioned to preview step');
     } catch (err) {
       console.error('[ImportInstanceModal] Error in handleSelectZip:', err);
+      const errorMessage = err?.message || (typeof err === 'string' ? err : 'Error desconocido');
+      const errorDetails = err?.stack || (typeof err === 'string' ? '' : JSON.stringify(err));
       setError({
-        message: `Error inspeccionar ZIP: ${err.message}`,
-        details: err.stack || ''
+        message: `Error inspeccionar ZIP: ${errorMessage}`,
+        details: errorDetails
       });
       setStep('error');
     }
@@ -156,9 +160,11 @@ export default function ImportInstanceModal({ onClose }) {
       }, 2000);
     } catch (err) {
       console.error('[ImportInstanceModal] Error in handleImport:', err);
+      const errorMessage = err?.message || (typeof err === 'string' ? err : 'Error desconocido');
+      const errorDetails = err?.stack || (typeof err === 'string' ? '' : JSON.stringify(err));
       setError({
-        message: `Error importando instancia: ${err.message}`,
-        details: err.stack || ''
+        message: `Error importando instancia: ${errorMessage}`,
+        details: errorDetails
       });
       setStep('error');
     }

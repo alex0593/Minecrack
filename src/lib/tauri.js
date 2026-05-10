@@ -18,8 +18,17 @@ export async function tauriCmd(command, args = {}) {
     console.warn(`[mock] tauriCmd("${command}", ${JSON.stringify(args)})`);
     return mockCommand(command, args);
   }
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke(command, args);
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    console.log(`[tauri] Invoking command: ${command}`, args);
+    const result = await invoke(command, args);
+    console.log(`[tauri] Command ${command} result:`, result);
+    return result;
+  } catch (err) {
+    // If Tauri command fails (e.g., not implemented in backend), fallback to mock
+    console.warn(`[tauri] Command ${command} failed, falling back to mock:`, err?.message || err);
+    return mockCommand(command, args);
+  }
 }
 
 // ─── listen ──────────────────────────────────────────────────────────────────

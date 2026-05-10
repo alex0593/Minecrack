@@ -262,51 +262,8 @@ export const importInstanceFromZip = (launcherDir, zipPath, newName) =>
   tauriCmd('import_instance_from_zip', { launcherDir, zipPath, newName });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Utilidades para inspeccionar ZIPs en el navegador (desarrollo)
+// (ZIP inspection utilities not available in browser - use reference data instead)
 // ─────────────────────────────────────────────────────────────────────────────
-async function inspectZipFile(zipPath) {
-  try {
-    // Importar JSZip dinámicamente si está disponible
-    const JSZip = window.JSZip || (await import('jszip')).default;
-    if (!JSZip) {
-      console.warn('[inspectZipFile] JSZip no disponible, usando mock');
-      return null;
-    }
-
-    // Leer el archivo ZIP usando fetch
-    const response = await fetch(`file://${zipPath}`);
-    if (!response.ok) {
-      console.warn('[inspectZipFile] No se pudo leer el archivo ZIP');
-      return null;
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const zip = new JSZip();
-    await zip.loadAsync(arrayBuffer);
-
-    // Intentar leer manifest.json
-    const manifestFile = zip.file('manifest.json');
-    if (manifestFile) {
-      const manifestText = await manifestFile.async('text');
-      const manifest = JSON.parse(manifestText);
-
-      // Contar mods en la lista
-      const modCount = manifest.files ? manifest.files.length : 0;
-
-      return {
-        name: manifest.name || 'Instancia importada',
-        version: manifest.minecraft?.version || '1.20.1',
-        loader: (manifest.minecraft?.modLoaders?.[0]?.id || 'vanilla').split('-')[0],
-        modsCount: modCount,
-        hasMetadata: true,
-        manifestData: manifest
-      };
-    }
-  } catch (err) {
-    console.warn('[inspectZipFile] Error inspeccionando ZIP:', err.message);
-  }
-  return null;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mocks para desarrollo en browser
@@ -405,19 +362,8 @@ async function mockCommand(command, _args) {
         }
       }
 
-      // Intentar inspeccionar el ZIP real si está disponible
-      try {
-        const realData = await inspectZipFile(zipPath);
-        if (realData) {
-          console.log('[mock] inspect_instance_zip - datos reales del ZIP:', realData);
-          return Promise.resolve(realData);
-        }
-      } catch (err) {
-        console.warn('[mock] Error inspeccionando ZIP real:', err.message);
-      }
-
       // Fallback a mock genérico
-      console.log('[mock] inspect_instance_zip - usando mock genérico');
+      console.log('[mock] inspect_instance_zip - usando mock genérico para:', zipPath);
       return Promise.resolve({
         name: 'MyInstance',
         version: '1.20.1',

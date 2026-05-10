@@ -1,0 +1,44 @@
+.error-modal {
+  max-width: 600px;
+}
+
+.error-header {
+  border-bottom-color: rgba(255, 107, 107, 0.2);
+  background: rgba(255, 107, 107, 0.05);
+}
+
+.error-message {
+  font-size: 14px;
+  color: var(--text-primary);
+  padding: 16px;
+  background: rgba(255, 107, 107, 0.08);
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.error-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.error-details-textarea {
+  width: 100%;
+  height: 180px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  resize: none;
+  overflow-y: auto;
+}
+
+.error-details-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}

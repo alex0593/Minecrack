@@ -178,6 +178,8 @@
   transform: translateY(-1px);
 }
 
+.mod-card.disabled { opacity: 0.5; }
+
 .mod-icon-box {
   width: 42px;
   height: 42px;
@@ -283,4 +285,161 @@
   gap: var(--gap-md);
   flex-wrap: wrap;
   justify-content: center;
+}
+
+/* ─── Mod view mode toggle ───────────────────────────────── */
+.mods-view-toggle {
+  display: flex;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.mods-view-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: var(--font-sans);
+}
+
+.mods-view-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.mods-view-btn.active { color: var(--accent); background: var(--accent-glow); }
+
+/* ─── List view ──────────────────────────────────────────── */
+.mods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mod-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition);
+}
+
+.mod-row:hover { border-color: rgba(255,255,255,0.12); }
+.mod-row.disabled { opacity: 0.5; }
+
+.mod-row-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.mod-row-info { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.mod-row-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mod-row-version { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.mod-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ─── Compact view ───────────────────────────────────────── */
+.mods-compact {
+  display: flex;
+  flex-direction: column;
+}
+
+.mod-row-compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  transition: background var(--transition);
+}
+
+.mod-row-compact:hover { background: var(--bg-surface); }
+.mod-row-compact.disabled { opacity: 0.45; }
+
+.mod-compact-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.mod-compact-dot.off { background: var(--text-muted); }
+
+.mod-compact-name { flex: 1; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mod-compact-version { font-size: 11px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+.mod-compact-actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity var(--transition); }
+.mod-row-compact:hover .mod-compact-actions { opacity: 1; }
+
+/* ─── Export notification ───────────────────────────────────── */
+.export-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  max-width: 350px;
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  animation: slideInUp 0.3s ease;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.export-notification-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-notification-icon {
+  font-size: 20px;
+  color: var(--accent);
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.export-notification-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-notification-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.export-notification-details {
+  font-size: 12px;
+  color: var(--text-muted);
 }

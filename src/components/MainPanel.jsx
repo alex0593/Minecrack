@@ -1,20 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import './MainPanel.css';
 import { useStore } from '../store';
 import { LOADERS } from '../lib/instances';
 import { listMods, deleteMod, toggleMod, getLauncherDir, exportInstanceMods, importInstanceMods, inspectModsZip, ensureDir } from '../lib/tauri';
+import { formatPlaytime, formatRelativeTime, formatLogTime } from '../lib/format';
 import ImportModsModal from './ImportModsModal';
+import ModpackBrowser from './ModpackBrowser';
+import SettingsPage from './SettingsPage';
 
 /* ─── Helpers ─────────────────────────────────── */
 const loaderBadge = (loader) => {
   const l = LOADERS.find(x => x.id === loader);
   return l ? <span className={`badge ${l.color}`}>{l.label}</span> : null;
-};
-
-const formatPlaytime = (secs) => {
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
 /* ─── Empty / Welcome ─────────────────────────── */
@@ -55,6 +52,21 @@ function ModsTab({ instance }) {
   const [loading, setLoading] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
+  // View mode: 'grid' | 'list' | 'compact' — persisted in localStorage
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('minecrack.modsViewMode') || 'grid'; }
+    catch { return 'grid'; }
+  });
+
+  // Export state
+  const [exporting, setExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(null); // { count, size, path } o null
+
+  const changeViewMode = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem('minecrack.modsViewMode', mode); } catch {}
+  };
+
   const handleDelete = async (filename) => {
     try {
       const launcherDir = await getLauncherDir();
@@ -79,21 +91,32 @@ function ModsTab({ instance }) {
 
   const handleExport = async () => {
     try {
-      setLoading(true);
+      setExporting(true);
+      setExportSuccess(null);
       const launcherDir = await getLauncherDir();
-      const zipPath = `${launcherDir}/exports/${instance.name}-mods.zip`;
+      const exportsDir = `${launcherDir}/exports`;
+      const zipPath = `${exportsDir}/${instance.name}-mods.zip`;
 
       // Crear directorio de exports
-      await ensureDir(`${launcherDir}/exports`);
+      await ensureDir(exportsDir);
 
       const result = await exportInstanceMods(launcherDir, instance.id, zipPath);
       const sizeMB = (result.size_bytes / (1024 * 1024)).toFixed(2);
-      alert(`✅ Mods exportados\n📦 ${result.mod_count} mods\n📁 ${sizeMB} MB`);
+
+      setExportSuccess({
+        count: result.mod_count,
+        size: sizeMB,
+        path: zipPath,
+        filename: `${instance.name}-mods.zip`,
+      });
+
+      // Auto-hide notification after 4 seconds
+      setTimeout(() => setExportSuccess(null), 4000);
     } catch (err) {
       console.error('[ModsTab] Error exportando mods:', err);
-      alert(`❌ Error exportando: ${err.message}`);
+      // Could show error notification here too
     } finally {
-      setLoading(false);
+      setExporting(false);
     }
   };
 
@@ -101,7 +124,26 @@ function ModsTab({ instance }) {
     <div>
       <div className="mods-header">
         <h3>Mods instalados ({mods.length})</h3>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* View mode toggle */}
+          <div className="mods-view-toggle">
+            <button
+              className={`mods-view-btn${viewMode === 'grid' ? ' active' : ''}`}
+              onClick={() => changeViewMode('grid')}
+              title="Vista en cuadrícula"
+            >⊞</button>
+            <button
+              className={`mods-view-btn${viewMode === 'list' ? ' active' : ''}`}
+              onClick={() => changeViewMode('list')}
+              title="Vista en lista"
+            >≡</button>
+            <button
+              className={`mods-view-btn${viewMode === 'compact' ? ' active' : ''}`}
+              onClick={() => changeViewMode('compact')}
+              title="Vista compacta"
+            >·</button>
+          </div>
+
           <button
             id="btn-add-mod"
             className="btn btn-primary btn-sm"
@@ -114,10 +156,10 @@ function ModsTab({ instance }) {
             id="btn-export-mods"
             className="btn btn-ghost btn-sm"
             onClick={handleExport}
-            disabled={loading || mods.length === 0}
+            disabled={loading || exporting || mods.length === 0}
             title="Exportar mods como ZIP"
           >
-            📦 Exportar
+            {exporting ? '⏳ Exportando...' : '📦 Exportar'}
           </button>
           <button
             id="btn-import-mods"
@@ -150,41 +192,118 @@ function ModsTab({ instance }) {
           }}
         />
       )}
-      {mods.length === 0 ? (
-        <div style={{ color: 'var(--text-muted)', padding: '32px 0', textAlign: 'center' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🧩</div>
-          <p>No hay mods instalados en esta instancia.</p>
-          <button
-            className="btn btn-ghost btn-sm"
-            style={{ marginTop: 12 }}
-            onClick={() => openModal('modBrowser', { instanceId: instance.id })}
-          >Explorar mods</button>
-        </div>
-      ) : (
-        <div className="mods-grid">
-          {mods.map(mod => (
-            <div key={mod.filename} className={`mod-card${!mod.enabled ? ' disabled' : ''}`}>
-              <div className="mod-icon-box">{mod.enabled ? '🧩' : '⊘'}</div>
-              <div className="mod-info">
-                <div className="mod-name">{mod.name}</div>
-                <div className="mod-desc">{mod.version}</div>
-                <div className="mod-actions">
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => handleToggle(mod.filename, mod.enabled)}
-                  >
-                    {mod.enabled ? '🔒 Desactivar' : '🔓 Activar'}
-                  </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => handleDelete(mod.filename)}
-                  >
-                    ✕ Quitar
-                  </button>
-                </div>
+
+      {/* Export success notification */}
+      {exportSuccess && (
+        <div className="export-notification">
+          <div className="export-notification-content">
+            <div className="export-notification-icon">✓</div>
+            <div className="export-notification-text">
+              <div className="export-notification-title">Exportado: {exportSuccess.filename}</div>
+              <div className="export-notification-details">
+                {exportSuccess.count} mod(s) • {exportSuccess.size} MB
               </div>
             </div>
-          ))}
+          </div>
+        </div>
+      )}
+
+      {mods.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-illustration">🧩</div>
+          <h3 className="empty-state-title">Sin mods instalados</h3>
+          <p className="empty-state-desc">
+            Agrega mods desde el catálogo de Modrinth/CurseForge o importa un ZIP existente.
+          </p>
+          <div className="empty-state-actions">
+            <button
+              className="empty-state-cta empty-state-cta-primary"
+              onClick={() => openModal('modBrowser', { instanceId: instance.id })}
+            >🔍 Explorar mods</button>
+            <button
+              className="empty-state-cta"
+              onClick={() => setShowImportModal(true)}
+            >📥 Importar ZIP</button>
+          </div>
+        </div>
+      ) : (
+        <div className={
+          viewMode === 'grid'    ? 'mods-grid'
+          : viewMode === 'list'  ? 'mods-list'
+          : 'mods-compact'
+        }>
+          {mods.map(mod => {
+            if (viewMode === 'compact') {
+              return (
+                <div key={mod.filename} className={`mod-row-compact${!mod.enabled ? ' disabled' : ''}`}>
+                  <span className={`mod-compact-dot${!mod.enabled ? ' off' : ''}`} />
+                  <span className="mod-compact-name">{mod.name}</span>
+                  <span className="mod-compact-version">{mod.version}</span>
+                  <div className="mod-compact-actions">
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleToggle(mod.filename, mod.enabled)}
+                    >
+                      {mod.enabled ? '🔒' : '🔓'}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDelete(mod.filename)}
+                    >✕</button>
+                  </div>
+                </div>
+              );
+            }
+
+            if (viewMode === 'list') {
+              return (
+                <div key={mod.filename} className={`mod-row${!mod.enabled ? ' disabled' : ''}`}>
+                  <div className="mod-row-icon">{mod.enabled ? '🧩' : '⊘'}</div>
+                  <div className="mod-row-info">
+                    <div className="mod-row-name">{mod.name}</div>
+                    <div className="mod-row-version">{mod.version}</div>
+                  </div>
+                  <div className="mod-row-actions">
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleToggle(mod.filename, mod.enabled)}
+                    >
+                      {mod.enabled ? '🔒 Desactivar' : '🔓 Activar'}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDelete(mod.filename)}
+                    >✕ Quitar</button>
+                  </div>
+                </div>
+              );
+            }
+
+            // Default: grid
+            return (
+              <div key={mod.filename} className={`mod-card${!mod.enabled ? ' disabled' : ''}`}>
+                <div className="mod-icon-box">{mod.enabled ? '🧩' : '⊘'}</div>
+                <div className="mod-info">
+                  <div className="mod-name">{mod.name}</div>
+                  <div className="mod-desc">{mod.version}</div>
+                  <div className="mod-actions">
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleToggle(mod.filename, mod.enabled)}
+                    >
+                      {mod.enabled ? '🔒 Desactivar' : '🔓 Activar'}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDelete(mod.filename)}
+                    >
+                      ✕ Quitar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -216,31 +335,200 @@ function StatsTab({ instance }) {
 
 /* ─── Console Tab ─────────────────────────────── */
 function ConsoleTab() {
-  const { state } = useStore();
-  const { gameLogs } = state;
+  const { state, dispatch } = useStore();
+  const { gameLogs, gameRunning } = state;
+  const [filter, setFilter] = useState('all');         // 'all' | 'info' | 'warn' | 'error'
+  const [search, setSearch] = useState('');
+  const [autoScroll, setAutoScroll] = useState(true);
+  const bodyRef = useRef(null);
+  const lastScrollHeight = useRef(0);
+
+  // Contadores por nivel
+  const counts = useMemo(() => {
+    const c = { all: gameLogs.length, info: 0, warn: 0, error: 0 };
+    for (const log of gameLogs) {
+      const lvl = log.level ?? 'info';
+      if (lvl === 'warn' || lvl === 'error') c[lvl]++;
+      else c.info++;
+    }
+    return c;
+  }, [gameLogs]);
+
+  // Logs filtrados (por nivel + búsqueda)
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return gameLogs.filter(log => {
+      const lvl = log.level ?? 'info';
+      if (filter !== 'all') {
+        if (filter === 'info' && (lvl === 'warn' || lvl === 'error')) return false;
+        if (filter === 'warn' && lvl !== 'warn') return false;
+        if (filter === 'error' && lvl !== 'error') return false;
+      }
+      if (q && !String(log.text).toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [gameLogs, filter, search]);
+
+  // Auto-scroll al fondo cuando llegan nuevos logs (si está activo)
+  useEffect(() => {
+    if (!bodyRef.current) return;
+    if (autoScroll) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+    lastScrollHeight.current = bodyRef.current.scrollHeight;
+  }, [filtered.length, autoScroll]);
+
+  // Detectar scroll manual del usuario para pausar auto-scroll
+  function handleScroll() {
+    const el = bodyRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distFromBottom < 50;
+    setAutoScroll(nearBottom);
+  }
+
+  function jumpToBottom() {
+    if (!bodyRef.current) return;
+    bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    setAutoScroll(true);
+  }
+
+  function copyAll() {
+    navigator.clipboard.writeText(filtered.map(l => l.text).join('\n'));
+  }
+
+  function clearAll() {
+    if (gameRunning) return;
+    dispatch({ type: 'SET_GAME_RUNNING', payload: { running: false } });
+  }
+
+  // Highlight de matches dentro de una línea
+  function highlightMatch(text) {
+    if (!search.trim()) return text;
+    const q = search.trim();
+    const parts = text.split(new RegExp(`(${escapeRegex(q)})`, 'ig'));
+    return parts.map((p, i) =>
+      p.toLowerCase() === q.toLowerCase()
+        ? <mark key={i}>{p}</mark>
+        : <span key={i}>{p}</span>
+    );
+  }
+
+  // Empty state cuando no hay logs ni juego
+  if (gameLogs.length === 0) {
+    return (
+      <div className="console-wrap">
+        <div className="console-empty">
+          <div className="empty-state">
+            <div className="empty-state-illustration">💻</div>
+            <h3 className="empty-state-title">Consola vacía</h3>
+            <p className="empty-state-desc">
+              {gameRunning
+                ? 'El juego está iniciando — los logs aparecerán pronto…'
+                : 'Inicia el juego para ver los logs aquí. La consola muestra mensajes del cliente Minecraft y el loader.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h3>Consola del juego</h3>
-        <button
-          id="btn-copy-log"
-          className="btn btn-ghost btn-sm"
-          onClick={() => navigator.clipboard.writeText(gameLogs.map(l => l.text).join('\n'))}
-        >📋 Copiar</button>
+    <div className="console-wrap">
+      {/* Header con filtros, búsqueda y acciones */}
+      <div className="console-header">
+        <div className="console-filters">
+          <button
+            className={`console-chip${filter === 'all' ? ' is-active' : ''}`}
+            onClick={() => setFilter('all')}
+          >
+            Todo <span className="console-chip-count">{counts.all}</span>
+          </button>
+          <button
+            className={`console-chip${filter === 'info' ? ' is-active' : ''}`}
+            onClick={() => setFilter('info')}
+          >
+            Info <span className="console-chip-count">{counts.info}</span>
+          </button>
+          <button
+            className={`console-chip chip-warn${filter === 'warn' ? ' is-active' : ''}`}
+            onClick={() => setFilter('warn')}
+          >
+            Warn <span className="console-chip-count">{counts.warn}</span>
+          </button>
+          <button
+            className={`console-chip chip-error${filter === 'error' ? ' is-active' : ''}`}
+            onClick={() => setFilter('error')}
+          >
+            Error <span className="console-chip-count">{counts.error}</span>
+          </button>
+        </div>
+
+        <input
+          type="text"
+          className="console-search"
+          placeholder="Buscar en logs…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+
+        <div className="console-actions">
+          <button
+            className="console-action-btn"
+            onClick={copyAll}
+            title="Copiar logs visibles"
+          >📋 Copiar</button>
+          <button
+            className="console-action-btn"
+            onClick={clearAll}
+            title="Limpiar consola (solo si el juego no está corriendo)"
+            disabled={gameRunning}
+          >🗑 Limpiar</button>
+        </div>
       </div>
-      <div className="console-box">
-        {gameLogs.length === 0
-          ? <span style={{ color: 'var(--text-muted)' }}>El juego no está corriendo...</span>
-          : gameLogs.map((line, i) => (
-            <div key={i} className={`log-line log-${line.level ?? 'info'}`}>
-              {line.text}
+
+      {/* Body con logs */}
+      <div
+        ref={bodyRef}
+        className="console-body"
+        onScroll={handleScroll}
+      >
+        {filtered.length === 0 ? (
+          <div className="console-empty">
+            <div className="empty-state">
+              <p className="empty-state-desc">
+                Sin resultados con los filtros actuales.
+              </p>
             </div>
-          ))
-        }
+          </div>
+        ) : (
+          // Render solo las últimas 1000 líneas para performance
+          filtered.slice(-1000).map((line, i) => {
+            const lvl = line.level ?? 'info';
+            const time = line.timestamp ? formatLogTime(line.timestamp) : formatLogTime();
+            return (
+              <div key={i} className="console-line">
+                <span className="console-line-time">{time}</span>
+                <span className={`console-line-level console-line-level-${lvl}`}>{lvl}</span>
+                <span className="console-line-msg">{highlightMatch(line.text)}</span>
+              </div>
+            );
+          })
+        )}
       </div>
+
+      {/* Floating button para saltar al final si el user scrolleó arriba */}
+      {!autoScroll && filtered.length > 0 && (
+        <button className="console-jump-bottom" onClick={jumpToBottom}>
+          ↓ Saltar al final
+        </button>
+      )}
     </div>
   );
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /* ─── Instance Detail ─────────────────────────── */
@@ -315,7 +603,27 @@ function InstanceDetail({ instance }) {
               <span className="badge badge-gray">MC {instance.version}</span>
               {loaderBadge(instance.loader)}
               <span className="badge badge-gray">
-                {instance.mods?.length ?? 0} mods
+                {state.instanceMods?.length ?? 0} mods
+              </span>
+              {isThisRunning && (
+                <span className="status-pill status-pill-running">
+                  <span className="dot" />
+                  Jugando
+                </span>
+              )}
+            </div>
+            <div className="hero-meta">
+              <span className="hero-meta-item" title="Tiempo total jugado">
+                <span className="icon">🕒</span>
+                Jugado {formatPlaytime(instance.playtime ?? 0)}
+              </span>
+              <span className="hero-meta-item" title="Última vez que se ejecutó">
+                <span className="icon">📅</span>
+                Último: {formatRelativeTime(instance.lastPlayed)}
+              </span>
+              <span className="hero-meta-item" title="RAM asignada">
+                <span className="icon">💾</span>
+                {((instance.ram ?? 2048) / 1024).toFixed(1)} GB RAM
               </span>
             </div>
           </div>
@@ -378,8 +686,25 @@ function InstanceDetail({ instance }) {
 /* ─── Main Panel ──────────────────────────────── */
 export default function MainPanel() {
   const { state } = useStore();
-  const { instances, selectedInstanceId } = state;
+  const { instances, selectedInstanceId, activeTab } = state;
   const selected = instances.find(i => i.id === selectedInstanceId);
+
+  // Global tabs take priority over instance view
+  if (activeTab === 'settings') {
+    return (
+      <main className="main-panel">
+        <SettingsPage />
+      </main>
+    );
+  }
+
+  if (activeTab === 'mods') {
+    return (
+      <main className="main-panel">
+        <ModpackBrowser />
+      </main>
+    );
+  }
 
   return (
     <main className="main-panel">

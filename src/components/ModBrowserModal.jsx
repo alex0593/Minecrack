@@ -6,6 +6,7 @@ import { resolveInstallPlan } from '../lib/mods/resolver';
 import { validateModCompatibility } from '../lib/mods/validator';
 import { downloadMod, getLauncherDir, listMods, tauriListen } from '../lib/tauri';
 import { LOADERS } from '../lib/instances';
+import Select from './ui/Select';
 import InstallConfirmModal from './InstallConfirmModal';
 import './ModBrowserModal.css';
 
@@ -217,17 +218,15 @@ function ModDetail({ mod, instance, onInstalled }) {
             No hay versiones compatibles con MC {instance.version} + {instance.loader}
           </div>
         ) : (
-          <select
-            className="modbrowser-select"
+          <Select
+            size="sm"
             value={selectedVer?.id ?? ''}
-            onChange={e => setSelectedVer(versions.find(v => v.id === e.target.value))}
-          >
-            {versions.map(v => (
-              <option key={v.id} value={v.id}>
-                {v.name} — {v.version_number}
-              </option>
-            ))}
-          </select>
+            onChange={(id) => setSelectedVer(versions.find(v => v.id === id))}
+            options={versions.map(v => ({
+              value: v.id,
+              label: `${v.name} — ${v.version_number}`,
+            }))}
+          />
         )}
       </div>
 
@@ -367,16 +366,19 @@ export default function ModBrowserModal({ instanceId, onClose }) {
             value={filterVersion}
             onChange={e => setFilterVersion(e.target.value)}
           />
-          <select
-            className="modbrowser-select"
+          <Select
+            size="sm"
             value={filterLoader}
-            onChange={e => setFilterLoader(e.target.value)}
-          >
-            <option value="">Todos los loaders</option>
-            {LOADERS_MODRINTH.map(l => (
-              <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
-            ))}
-          </select>
+            onChange={setFilterLoader}
+            placeholder="Todos los loaders"
+            options={[
+              { value: '', label: 'Todos los loaders' },
+              ...LOADERS_MODRINTH.map(l => ({
+                value: l,
+                label: l.charAt(0).toUpperCase() + l.slice(1),
+              })),
+            ]}
+          />
         </div>
 
         {/* Cuerpo */}

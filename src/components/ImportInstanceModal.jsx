@@ -20,11 +20,16 @@ export default function ImportInstanceModal({ onClose }) {
     try {
       setStep('inspecting');
       setProgress(0);
+      console.log('[ImportInstanceModal] Starting folder selection');
+
       const path = await pickFolder({
         title: 'Seleccionar carpeta de instancia'
       });
 
+      console.log('[ImportInstanceModal] pickFolder result:', path);
+
       if (!path) {
+        console.warn('[ImportInstanceModal] No path selected, returning to idle');
         setStep('idle');
         return;
       }
@@ -33,13 +38,17 @@ export default function ImportInstanceModal({ onClose }) {
       setSourceType('folder');
       setProgress(50);
 
+      console.log('[ImportInstanceModal] Inspecting folder:', path);
       const inspection = await inspectInstanceFolder(path);
+      console.log('[ImportInstanceModal] Inspection result:', inspection);
       setProgress(100);
 
       setPreview(inspection);
       setNewInstanceName(inspection.name ? `${inspection.name} (copia)` : 'Nueva instancia');
       setStep('preview');
+      console.log('[ImportInstanceModal] Transitioned to preview step');
     } catch (err) {
+      console.error('[ImportInstanceModal] Error in handleSelectFolder:', err);
       setError({
         message: `Error inspeccionar carpeta: ${err.message}`,
         details: err.stack || ''
@@ -52,12 +61,17 @@ export default function ImportInstanceModal({ onClose }) {
     try {
       setStep('inspecting');
       setProgress(0);
+      console.log('[ImportInstanceModal] Starting ZIP selection');
+
       const path = await pickFile({
         title: 'Seleccionar ZIP de instancia',
         filters: [{ name: 'ZIP', extensions: ['zip'] }]
       });
 
+      console.log('[ImportInstanceModal] pickFile result:', path);
+
       if (!path) {
+        console.warn('[ImportInstanceModal] No path selected, returning to idle');
         setStep('idle');
         return;
       }
@@ -66,13 +80,17 @@ export default function ImportInstanceModal({ onClose }) {
       setSourceType('zip');
       setProgress(50);
 
+      console.log('[ImportInstanceModal] Inspecting ZIP:', path);
       const inspection = await inspectInstanceZip(path);
+      console.log('[ImportInstanceModal] Inspection result:', inspection);
       setProgress(100);
 
       setPreview(inspection);
       setNewInstanceName(inspection.name ? `${inspection.name} (copia)` : 'Nueva instancia');
       setStep('preview');
+      console.log('[ImportInstanceModal] Transitioned to preview step');
     } catch (err) {
+      console.error('[ImportInstanceModal] Error in handleSelectZip:', err);
       setError({
         message: `Error inspeccionar ZIP: ${err.message}`,
         details: err.stack || ''
@@ -82,36 +100,62 @@ export default function ImportInstanceModal({ onClose }) {
   };
 
   const handleImport = async () => {
-    if (!sourcePath || !newInstanceName) return;
+    console.log('[ImportInstanceModal] handleImport called', { sourcePath, newInstanceName });
+
+    if (!sourcePath || !newInstanceName) {
+      console.warn('[ImportInstanceModal] Missing sourcePath or newInstanceName, aborting import');
+      return;
+    }
 
     try {
       setStep('importing');
       setProgress(0);
 
+      console.log('[ImportInstanceModal] Getting launcher directory');
       const launcherDir = await getLauncherDir();
+      console.log('[ImportInstanceModal] Launcher dir:', launcherDir);
 
       // Simular progreso
       const progressInterval = setInterval(() => {
         setProgress(p => Math.min(90, p + Math.random() * 20));
       }, 200);
 
+      console.log('[ImportInstanceModal] Starting import, sourceType:', sourceType);
       const result = sourceType === 'folder'
         ? await importInstanceFromFolder(launcherDir, sourcePath, newInstanceName)
         : await importInstanceFromZip(launcherDir, sourcePath, newInstanceName);
 
+      console.log('[ImportInstanceModal] Import result:', result);
       clearInterval(progressInterval);
       setProgress(100);
 
       setImportedInstanceId(result.newInstanceId);
+
+      // Crear objeto de instancia para agregar al store
+      const newInstance = {
+        id: result.newInstanceId,
+        name: newInstanceName,
+        version: preview?.version || '1.20.1',
+        loader: preview?.loader || 'vanilla',
+        icon: '📦',
+        installed: true,
+        lastPlayed: new Date().toISOString(),
+      };
+
+      console.log('[ImportInstanceModal] Adding new instance to store:', newInstance);
+      dispatch({ type: 'ADD_INSTANCE', payload: newInstance });
+
       setStep('done');
 
-      // Refresca instancias en el store (backend debería haber actualizado instances.json)
-      // Aquí el usuario verá la nueva instancia en el sidebar
+      // La instancia ya está en el store y aparecerá en el sidebar
+      console.log('[ImportInstanceModal] Import completed successfully');
 
       setTimeout(() => {
+        console.log('[ImportInstanceModal] Closing modal');
         onClose();
       }, 2000);
     } catch (err) {
+      console.error('[ImportInstanceModal] Error in handleImport:', err);
       setError({
         message: `Error importando instancia: ${err.message}`,
         details: err.stack || ''

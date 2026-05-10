@@ -11,6 +11,7 @@ const initialState = {
   profile: {
     username: '',
     uuid: null,
+    skin: null,  // Ruta a archivo PNG o data URL de skin
   },
   profileReady: false,
 
@@ -25,6 +26,7 @@ const initialState = {
   // Juego corriendo
   gameRunning: false,
   gameInstanceId: null,
+  gameStartedAt: null,      // ms epoch — para calcular delta de playtime al cerrar
   gameLogs: [],
 
   // Configuración global
@@ -95,16 +97,55 @@ function reducer(state, action) {
     case 'SET_DOWNLOAD':
       return { ...state, download: action.payload };
 
-    case 'SET_GAME_RUNNING':
+    case 'SET_GAME_RUNNING': {
+      const { running, instanceId } = action.payload;
+      const now = Date.now();
+
+      // Iniciando juego: guardar timestamp y limpiar logs
+      if (running) {
+        return {
+          ...state,
+          gameRunning: true,
+          gameInstanceId: instanceId ?? null,
+          gameStartedAt: now,
+          gameLogs: [],
+        };
+      }
+
+      // Cerrando juego: calcular delta y actualizar instancia
+      const startedAt = state.gameStartedAt;
+      const playedInstId = state.gameInstanceId;
+      let updatedInstances = state.instances;
+
+      if (startedAt && playedInstId) {
+        const playedSec = Math.max(0, Math.floor((now - startedAt) / 1000));
+        updatedInstances = state.instances.map(inst =>
+          inst.id === playedInstId
+            ? {
+                ...inst,
+                playtime: (inst.playtime || 0) + playedSec,
+                lastPlayed: now,
+              }
+            : inst
+        );
+      }
+
       return {
         ...state,
-        gameRunning: action.payload.running,
-        gameInstanceId: action.payload.instanceId ?? null,
-        gameLogs: action.payload.running ? [] : state.gameLogs,
+        gameRunning: false,
+        gameInstanceId: null,
+        gameStartedAt: null,
+        instances: updatedInstances,
       };
+    }
 
-    case 'ADD_LOG':
-      return { ...state, gameLogs: [...state.gameLogs.slice(-499), action.payload] };
+    case 'ADD_LOG': {
+      // Asegurar que cada log tenga timestamp para la consola
+      const logEntry = action.payload.timestamp
+        ? action.payload
+        : { ...action.payload, timestamp: Date.now() };
+      return { ...state, gameLogs: [...state.gameLogs.slice(-499), logEntry] };
+    }
 
     case 'SET_ERROR':
       return { ...state, errorMessage: action.payload };

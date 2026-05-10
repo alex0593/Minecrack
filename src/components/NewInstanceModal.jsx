@@ -2,17 +2,19 @@ import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store';
 import { createInstance, POPULAR_VERSIONS, LOADERS } from '../lib/instances';
 import { getCompatibleLoaderVersions, getLatestCompatibleVersion, isLoaderAvailable } from '../lib/loaders/versions';
+import Select from './ui/Select';
 
 const ICONS = ['🟩','⛏','🌲','🔥','❄️','⚡','🏔','🌊','🐉','💎','🛡','🗡','🧪','🌙','☀️','🎯'];
 
 export default function NewInstanceModal() {
-  const { dispatch, closeModal } = useStore();
+  const { dispatch, closeModal, state } = useStore();
+  const prefill = state.modalData?.prefill ?? null;
   const [step, setStep] = useState(1);
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(prefill?.name ?? '');
   const [icon, setIcon] = useState('⛏');
-  const [version, setVersion] = useState('');
-  const [loader, setLoader] = useState('vanilla');
+  const [version, setVersion] = useState(prefill?.version ?? '');
+  const [loader, setLoader] = useState(prefill?.loader ?? 'vanilla');
   const [loaderVersion, setLoaderVersion] = useState('latest');
   const [versionMode, setVersionMode] = useState('latest'); // 'latest' o 'specific'
 
@@ -168,18 +170,13 @@ export default function NewInstanceModal() {
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
                 Versión de Minecraft
               </label>
-              <select
-                id="select-version"
-                className="input"
+              <Select
                 value={version}
-                onChange={e => setVersion(e.target.value)}
-                style={{ cursor: 'pointer' }}
-              >
-                <option value="">— Selecciona una versión —</option>
-                {POPULAR_VERSIONS.map(v => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
+                onChange={setVersion}
+                placeholder="— Selecciona una versión —"
+                searchable
+                options={POPULAR_VERSIONS.map(v => ({ value: v, label: v }))}
+              />
             </div>
           </div>
         )}
@@ -272,34 +269,19 @@ export default function NewInstanceModal() {
 
                       {/* Version selector */}
                       {versionMode === 'specific' && (
-                        <select
+                        <Select
+                          size="sm"
                           value={loaderVersion}
-                          onChange={e => setLoaderVersion(e.target.value)}
-                          style={{
-                            background: 'var(--bg-elevated)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 4,
-                            color: 'var(--text-primary)',
-                            padding: '6px 10px',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <option value="">— Selecciona versión —</option>
-                          {isLoading ? (
-                            <option disabled>Cargando versiones...</option>
-                          ) : currentLoaderVersions.length > 0 ? (
-                            currentLoaderVersions.map(v => (
-                              <option key={v.version} value={v.version}>
-                                {v.version}
-                                {v.isLatest ? ' (más reciente)' : ''}
-                                {!v.stable ? ' [beta]' : ''}
-                              </option>
-                            ))
-                          ) : (
-                            <option disabled>No hay versiones disponibles</option>
-                          )}
-                        </select>
+                          onChange={setLoaderVersion}
+                          placeholder={isLoading ? 'Cargando versiones…' : '— Selecciona versión —'}
+                          disabled={isLoading || currentLoaderVersions.length === 0}
+                          searchable
+                          options={currentLoaderVersions.map(v => ({
+                            value: v.version,
+                            label: v.version,
+                            badge: v.isLatest ? 'latest' : (!v.stable ? 'beta' : null),
+                          }))}
+                        />
                       )}
 
                       {/* Info about selected version */}

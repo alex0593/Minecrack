@@ -1,0 +1,219 @@
+/* Select.css — Custom dropdown */
+
+.ui-select {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.ui-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.ui-select-sm .ui-select-trigger {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.ui-select-trigger:hover:not(:disabled) {
+  border-color: rgba(255,255,255,0.12);
+  background: var(--bg-hover);
+}
+
+.ui-select.is-open .ui-select-trigger {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.ui-select-trigger:disabled,
+.ui-select.is-disabled .ui-select-trigger {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-select-value {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-select-value.is-placeholder {
+  color: var(--text-muted);
+}
+
+.ui-select-badge {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent-glow);
+  color: var(--accent);
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ui-select-arrow {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+}
+
+.ui-select.is-open .ui-select-arrow {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+/* Popover */
+.ui-select-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--bg-modal);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  animation: uiSelectIn 0.14s ease-out;
+}
+
+@keyframes uiSelectIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ui-select-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.ui-select-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.ui-select-search-input:focus {
+  border-color: var(--border-accent);
+}
+
+.ui-select-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.ui-select-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ui-select-list::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+.ui-select-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ui-select-option {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+  font-size: 13px;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.ui-select-sm .ui-select-option {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.ui-select-option.is-highlighted {
+  background: var(--bg-hover);
+}
+
+.ui-select-option.is-selected {
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.ui-select-option.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ui-select-option-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-select-option-badge {
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ui-select-option.is-selected .ui-select-option-badge {
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
+.ui-select-option-check {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.ui-select-empty {
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  list-style: none;
+}

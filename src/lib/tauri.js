@@ -148,9 +148,12 @@ export async function pickFile({ title = 'Seleccionar archivo', filters } = {}) 
   if (!IS_TAURI) return '/mock/path/java';
   try {
     const { open } = await import('@tauri-apps/plugin-dialog');
-    return await open({ multiple: false, directory: false, title, filters });
-  } catch {
-    return null;
+    const path = await open({ multiple: false, directory: false, title, filters });
+    console.log(`[pickFile] Selected: ${path}`);
+    return path;
+  } catch (err) {
+    console.warn(`[pickFile] Error using Tauri dialog, falling back to mock:`, err?.message || err);
+    return '/mock/path/file.zip'; // Fallback to mock for dev mode
   }
 }
 
@@ -162,9 +165,12 @@ export async function pickFolder({ title = 'Seleccionar carpeta' } = {}) {
   if (!IS_TAURI) return '/mock/path/folder';
   try {
     const { open } = await import('@tauri-apps/plugin-dialog');
-    return await open({ multiple: false, directory: true, title });
-  } catch {
-    return null;
+    const path = await open({ multiple: false, directory: true, title });
+    console.log(`[pickFolder] Selected: ${path}`);
+    return path;
+  } catch (err) {
+    console.warn(`[pickFolder] Error using Tauri dialog, falling back to mock:`, err?.message || err);
+    return '/mock/path/folder'; // Fallback to mock for dev mode
   }
 }
 

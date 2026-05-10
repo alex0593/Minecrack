@@ -100,6 +100,34 @@ export function createModrinthFetcher() {
 }
 
 /**
+ * Busca modpacks en Modrinth
+ */
+export async function searchModpacks({ query = '', gameVersion, loader, limit = 20, offset = 0 } = {}) {
+  const facets = [['project_type:modpack']];
+  if (gameVersion) facets.push([`versions:${gameVersion}`]);
+  if (loader && loader !== 'vanilla') facets.push([`categories:${loader}`]);
+
+  const params = new URLSearchParams({
+    query,
+    limit,
+    offset,
+    facets: JSON.stringify(facets),
+  });
+
+  return get(`/search?${params}`);
+}
+
+/**
+ * Obtiene versiones de un modpack
+ */
+export async function getModpackVersions(projectId, { gameVersion, loader } = {}) {
+  const params = new URLSearchParams();
+  if (gameVersion) params.set('game_versions', JSON.stringify([gameVersion]));
+  if (loader && loader !== 'vanilla') params.set('loaders', JSON.stringify([loader]));
+  return get(`/project/${projectId}/version?${params}`);
+}
+
+/**
  * @deprecated Usar resolveInstallPlan() de mods/resolver.js en su lugar.
  * Se mantiene para no romper código existente.
  */

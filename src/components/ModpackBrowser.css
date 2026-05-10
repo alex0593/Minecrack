@@ -1,0 +1,319 @@
+/* ── ModpackBrowser — full-page modpack browser ─────────────────────────── */
+
+.mpbrowser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+/* Header */
+.mpbrowser-header {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.mpbrowser-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+/* Filters bar */
+.mpbrowser-filters {
+  display: flex;
+  gap: var(--gap-sm);
+  padding: 12px 24px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.mpbrowser-search {
+  flex: 1;
+  min-width: 200px;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.mpbrowser-search:focus {
+  border-color: var(--border-accent);
+}
+
+.mpbrowser-filter-input {
+  width: 110px;
+  height: 36px;
+  padding: 0 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.mpbrowser-filter-input:focus {
+  border-color: var(--border-accent);
+}
+
+/* Body */
+.mpbrowser-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left list */
+.mpbrowser-list {
+  width: 360px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  padding: var(--gap-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mpbrowser-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+.mpbrowser-loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 48px 0;
+  font-size: 13px;
+}
+
+/* Modpack card in list */
+.mpbrowser-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition), border-color var(--transition);
+  width: 100%;
+}
+
+.mpbrowser-card:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+.mpbrowser-card.selected {
+  background: var(--accent-glow);
+  border-color: var(--border-accent);
+}
+
+.mpbrowser-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+}
+
+.mpbrowser-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.mpbrowser-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mpbrowser-card-author {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.mpbrowser-card-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mpbrowser-card-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.mpbrowser-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.mpbrowser-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.mpbrowser-tag-fabric { border-color: rgba(79, 195, 247, 0.3); color: var(--blue); }
+.mpbrowser-tag-forge  { border-color: rgba(255, 183, 77, 0.3); color: var(--amber); }
+.mpbrowser-tag-quilt  { border-color: rgba(179, 157, 219, 0.3); color: var(--purple); }
+.mpbrowser-tag-neoforge { border-color: rgba(239, 83, 80, 0.3); color: var(--red); }
+
+/* Right detail panel */
+.mpbrowser-detail-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.mpbrowser-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 14px;
+  gap: 12px;
+  text-align: center;
+}
+
+.mpbrowser-detail-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.mpbrowser-detail-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+}
+
+.mpbrowser-detail-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.mpbrowser-detail-by {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.mpbrowser-detail-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.mpbrowser-detail-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.mpbrowser-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.mpbrowser-detail-section {
+  margin-bottom: 16px;
+}
+
+.mpbrowser-detail-section label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.mpbrowser-no-versions {
+  font-size: 12px;
+  color: var(--amber);
+  padding: 8px 12px;
+  background: rgba(255, 183, 77, 0.08);
+  border: 1px solid rgba(255, 183, 77, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.mpbrowser-version-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.mpbrowser-install-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mpbrowser-install-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 8px;
+  line-height: 1.5;
+}

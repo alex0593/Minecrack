@@ -1,13 +1,28 @@
+import { useState } from 'react';
 import './Sidebar.css';
 import { useStore } from '../store';
 import { LOADERS } from '../lib/instances';
+import { formatRelativeTime } from '../lib/format';
+import ImportInstanceModal from './ImportInstanceModal';
 
 export default function Sidebar() {
+  const [showImportModal, setShowImportModal] = useState(false);
   const { state, dispatch, openModal } = useStore();
-  const { instances, selectedInstanceId, activeTab, profile, profileReady } = state;
+  const { instances, selectedInstanceId, activeTab, profile, profileReady, gameRunning, gameInstanceId } = state;
 
   const loaderLabel = (l) => LOADERS.find(x => x.id === l)?.label ?? 'Vanilla';
-  const loaderColor = (l) => LOADERS.find(x => x.id === l)?.color ?? 'badge-green';
+
+  const getInstanceStatus = (inst) => {
+    if (gameRunning && gameInstanceId === inst.id) return 'running';
+    if (!inst.installed) return 'pending';
+    return 'ready';
+  };
+
+  const statusLabel = {
+    running: 'Jugando',
+    pending: 'Sin instalar',
+    ready:   'Listo',
+  };
 
   return (
     <aside className="sidebar">
@@ -38,7 +53,7 @@ export default function Sidebar() {
         <div className="sidebar-nav-label">Menú</div>
         {[
           { id: 'instances', icon: '⊞', label: 'Instancias' },
-          { id: 'mods',      icon: '⚙', label: 'Mods' },
+          { id: 'mods',      icon: '📦', label: 'Modpacks' },
           { id: 'settings',  icon: '⚙', label: 'Configuración' },
         ].map(item => (
           <button
@@ -56,40 +71,79 @@ export default function Sidebar() {
       {/* Instance list */}
       <div className="sidebar-instances-header">
         <span className="sidebar-instances-title">Instancias ({instances.length})</span>
-        <button
-          id="btn-new-instance-sidebar"
-          className="btn btn-primary btn-sm"
-          onClick={() => openModal('newInstance')}
-        >+ Nueva</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            id="btn-import-instance-sidebar"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setShowImportModal(true)}
+            title="Importar instancia desde carpeta o ZIP"
+          >📥</button>
+          <button
+            id="btn-new-instance-sidebar"
+            className="btn btn-primary btn-sm"
+            onClick={() => openModal('newInstance')}
+          >+ Nueva</button>
+        </div>
       </div>
 
       <div className="sidebar-instances-list">
         {instances.length === 0 ? (
-          <div className="sidebar-empty">
-            <div className="sidebar-empty-icon">📦</div>
-            <p className="sidebar-empty-text">
-              No hay instancias.<br />Crea una para empezar.
+          <div className="empty-state">
+            <div className="empty-state-illustration">📦</div>
+            <h3 className="empty-state-title">Sin instancias</h3>
+            <p className="empty-state-desc">
+              Crea tu primera instancia para empezar a jugar Minecraft.
             </p>
+            <div className="empty-state-actions">
+              <button
+                className="empty-state-cta empty-state-cta-primary"
+                onClick={() => openModal('newInstance')}
+              >+ Crear instancia</button>
+            </div>
           </div>
         ) : (
-          instances.map(inst => (
-            <div
-              key={inst.id}
-              id={`instance-${inst.id}`}
-              className={`instance-item${selectedInstanceId === inst.id ? ' selected' : ''}`}
-              onClick={() => dispatch({ type: 'SELECT_INSTANCE', payload: inst.id })}
-            >
-              <div className="instance-icon">{inst.icon}</div>
-              <div className="instance-item-info">
-                <div className="instance-item-name">{inst.name}</div>
-                <div className="instance-item-meta">
-                  {inst.version} · {loaderLabel(inst.loader)}
+          instances.map(inst => {
+            const status = getInstanceStatus(inst);
+            return (
+              <div
+                key={inst.id}
+                id={`instance-${inst.id}`}
+                className={`instance-card${selectedInstanceId === inst.id ? ' is-selected' : ''}`}
+                onClick={() => dispatch({ type: 'SELECT_INSTANCE', payload: inst.id })}
+              >
+                <div className="instance-card-icon">{inst.icon}</div>
+                <div className="instance-card-body">
+                  <div className="instance-card-name">{inst.name}</div>
+                  <div className="instance-card-badges">
+                    <span className="instance-card-badge instance-card-badge-mc">{inst.version}</span>
+                    <span className={`instance-card-badge instance-card-badge-${inst.loader}`}>
+                      {loaderLabel(inst.loader)}
+                    </span>
+                  </div>
+                  <div className="instance-card-meta">
+                    <span className="instance-card-meta-time">
+                      {inst.lastPlayed
+                        ? formatRelativeTime(inst.lastPlayed)
+                        : 'No jugado'}
+                    </span>
+                    <span className={`status-pill status-pill-${status}`}>
+                      <span className="dot" />
+                      {statusLabel[status]}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
+
+      {/* Import instance modal */}
+      {showImportModal && (
+        <ImportInstanceModal
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
 
       {/* Bottom */}
       <div className="sidebar-bottom">

@@ -5,6 +5,7 @@ import { LOADERS } from '../lib/instances';
 import { listMods, deleteMod, toggleMod, getLauncherDir, exportInstanceMods, importInstanceMods, inspectModsZip, ensureDir } from '../lib/tauri';
 import { formatPlaytime, formatRelativeTime, formatLogTime } from '../lib/format';
 import ImportModsModal from './ImportModsModal';
+import ExportInstanceModal from './ExportInstanceModal';
 import ModpackBrowser from './ModpackBrowser';
 import SettingsPage from './SettingsPage';
 
@@ -534,6 +535,7 @@ function escapeRegex(s) {
 /* ─── Instance Detail ─────────────────────────── */
 function InstanceDetail({ instance }) {
   const [activeTab, setActiveTab] = useState('mods');
+  const [showExportModal, setShowExportModal] = useState(false);
   const { state, dispatch, openModal } = useStore();
 
   // Ctrl+` abre la consola
@@ -641,6 +643,12 @@ function InstanceDetail({ instance }) {
               title="Configuración de instancia"
             >⚙</button>
             <button
+              id="btn-export-instance"
+              className="btn btn-ghost"
+              onClick={() => setShowExportModal(true)}
+              title="Hacer backup de instancia"
+            >💾</button>
+            <button
               id="btn-play-instance"
               className={`btn-play${isThisRunning ? ' running' : ''}${!instance.installed ? ' install' : ''}`}
               style={!instance.installed ? {
@@ -679,6 +687,14 @@ function InstanceDetail({ instance }) {
         {activeTab === 'stats'   && <StatsTab   instance={instance} />}
         {activeTab === 'console' && <ConsoleTab />}
       </div>
+
+      {/* Export instance modal */}
+      {showExportModal && (
+        <ExportInstanceModal
+          instance={instance}
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
     </div>
   );
 }

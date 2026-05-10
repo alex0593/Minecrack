@@ -141,6 +141,34 @@ export const extractZip = (zipPath, destDir) =>
   tauriCmd('extract_zip', { zipPath, destDir });
 
 /**
+ * Abre un diálogo nativo para seleccionar un archivo.
+ * @returns {Promise<string|null>} Ruta seleccionada o null si canceló
+ */
+export async function pickFile({ title = 'Seleccionar archivo', filters } = {}) {
+  if (!IS_TAURI) return '/mock/path/java';
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    return await open({ multiple: false, directory: false, title, filters });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Abre un diálogo nativo para seleccionar una carpeta.
+ * @returns {Promise<string|null>} Ruta seleccionada o null si canceló
+ */
+export async function pickFolder({ title = 'Seleccionar carpeta' } = {}) {
+  if (!IS_TAURI) return '/mock/path/folder';
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    return await open({ multiple: false, directory: true, title });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Verifica la integridad de una instancia.
  * @returns {Promise<{status, total, missing, corrupt}>}
  */
@@ -153,6 +181,45 @@ export const verifyInstance = (launcherDir, instanceId) =>
  */
 export const getRepairTasks = (launcherDir, instanceId, fixCorrupt = true) =>
   tauriCmd('get_repair_tasks', { launcherDir, instanceId, fixCorrupt });
+
+/**
+ * Exporta instancia completa a ZIP o carpeta
+ * @param {string} launcherDir
+ * @param {string} instanceId
+ * @param {string} destPath - ruta del ZIP o carpeta destino
+ * @param {Object} options - { mods, config, saves, resourcepacks }
+ * @returns {Promise<{path, size_bytes, items_count}>}
+ */
+export const exportInstance = (launcherDir, instanceId, destPath, options) =>
+  tauriCmd('export_instance', { launcherDir, instanceId, destPath, options });
+
+/**
+ * Inspecciona una carpeta para validar como instancia
+ * @returns {Promise<{name, version, loader, modsCount, hasMetadata}>}
+ */
+export const inspectInstanceFolder = (folderPath) =>
+  tauriCmd('inspect_instance_folder', { folderPath });
+
+/**
+ * Inspecciona un ZIP para validar como instancia exportada
+ * @returns {Promise<{name, version, loader, modsCount, hasMetadata}>}
+ */
+export const inspectInstanceZip = (zipPath) =>
+  tauriCmd('inspect_instance_zip', { zipPath });
+
+/**
+ * Importa instancia desde carpeta
+ * @returns {Promise<{newInstanceId, imported}>}
+ */
+export const importInstanceFromFolder = (launcherDir, folderPath, newName) =>
+  tauriCmd('import_instance_from_folder', { launcherDir, folderPath, newName });
+
+/**
+ * Importa instancia desde ZIP
+ * @returns {Promise<{newInstanceId, imported}>}
+ */
+export const importInstanceFromZip = (launcherDir, zipPath, newName) =>
+  tauriCmd('import_instance_from_zip', { launcherDir, zipPath, newName });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mocks para desarrollo en browser
@@ -217,6 +284,28 @@ function mockCommand(command, _args) {
       return Promise.resolve();
     case 'open_dialog':
       return Promise.resolve('/mock/path');
+    case 'export_instance':
+      return Promise.resolve({ path: '/mock/instance-backup.zip', size_bytes: 52428800, items_count: 15 });
+    case 'inspect_instance_folder':
+      return Promise.resolve({
+        name: 'MyInstance',
+        version: '1.20.1',
+        loader: 'fabric',
+        modsCount: 5,
+        hasMetadata: true,
+      });
+    case 'inspect_instance_zip':
+      return Promise.resolve({
+        name: 'MyInstance',
+        version: '1.20.1',
+        loader: 'fabric',
+        modsCount: 5,
+        hasMetadata: true,
+      });
+    case 'import_instance_from_folder':
+      return Promise.resolve({ newInstanceId: 'new-uuid-1234', imported: 5 });
+    case 'import_instance_from_zip':
+      return Promise.resolve({ newInstanceId: 'new-uuid-1234', imported: 5 });
     default:
       return Promise.reject(new Error(`Comando "${command}" no reconocido`));
   }

@@ -1,0 +1,112 @@
+.export-instance-modal {
+  max-width: 520px;
+}
+
+.export-section {
+  margin-bottom: 24px;
+}
+
+.export-section h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.export-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.export-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.export-checkbox:hover {
+  border-color: var(--border-accent);
+  background: var(--bg-hover);
+}
+
+.export-checkbox input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.export-checkbox > span:nth-child(2) {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.export-checkbox-desc {
+  display: block !important;
+  font-size: 11px !important;
+  color: var(--text-muted) !important;
+  font-weight: 400 !important;
+  margin-top: 2px;
+}
+
+.export-format-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.export-format-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: left;
+  font-family: inherit;
+  color: var(--text-primary);
+}
+
+.export-format-btn:hover {
+  border-color: var(--border-accent);
+  background: var(--bg-hover);
+}
+
+.export-format-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--text-primary);
+}
+
+.export-format-btn.active .export-format-title {
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+.export-format-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.export-format-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}

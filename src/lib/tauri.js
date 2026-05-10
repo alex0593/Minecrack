@@ -12,6 +12,31 @@
 
 const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
+// Datos de referencia para desarrollo (mocks reales basados en ZIPs de ejemplo)
+const DEV_REFERENCE_DATA = {
+  '/mock/path/file.zip': { // Para pickFile genérico
+    name: 'MyInstance',
+    version: '1.20.1',
+    loader: 'fabric',
+    modsCount: 5,
+    hasMetadata: true
+  },
+  'TINKERS-CREATE': { // Para el ZIP específico de referencia
+    name: 'TINKERS-CREATE',
+    version: '1.19.2',
+    loader: 'forge',
+    modsCount: 79,
+    hasMetadata: true
+  },
+  'TINKERS-CREATE.zip': {
+    name: 'TINKERS-CREATE',
+    version: '1.19.2',
+    loader: 'forge',
+    modsCount: 79,
+    hasMetadata: true
+  }
+};
+
 // ─── invoke ──────────────────────────────────────────────────────────────────
 export async function tauriCmd(command, args = {}) {
   if (!IS_TAURI) {
@@ -237,9 +262,56 @@ export const importInstanceFromZip = (launcherDir, zipPath, newName) =>
   tauriCmd('import_instance_from_zip', { launcherDir, zipPath, newName });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Utilidades para inspeccionar ZIPs en el navegador (desarrollo)
+// ─────────────────────────────────────────────────────────────────────────────
+async function inspectZipFile(zipPath) {
+  try {
+    // Importar JSZip dinámicamente si está disponible
+    const JSZip = window.JSZip || (await import('jszip')).default;
+    if (!JSZip) {
+      console.warn('[inspectZipFile] JSZip no disponible, usando mock');
+      return null;
+    }
+
+    // Leer el archivo ZIP usando fetch
+    const response = await fetch(`file://${zipPath}`);
+    if (!response.ok) {
+      console.warn('[inspectZipFile] No se pudo leer el archivo ZIP');
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const zip = new JSZip();
+    await zip.loadAsync(arrayBuffer);
+
+    // Intentar leer manifest.json
+    const manifestFile = zip.file('manifest.json');
+    if (manifestFile) {
+      const manifestText = await manifestFile.async('text');
+      const manifest = JSON.parse(manifestText);
+
+      // Contar mods en la lista
+      const modCount = manifest.files ? manifest.files.length : 0;
+
+      return {
+        name: manifest.name || 'Instancia importada',
+        version: manifest.minecraft?.version || '1.20.1',
+        loader: (manifest.minecraft?.modLoaders?.[0]?.id || 'vanilla').split('-')[0],
+        modsCount: modCount,
+        hasMetadata: true,
+        manifestData: manifest
+      };
+    }
+  } catch (err) {
+    console.warn('[inspectZipFile] Error inspeccionando ZIP:', err.message);
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Mocks para desarrollo en browser
 // ─────────────────────────────────────────────────────────────────────────────
-function mockCommand(command, _args) {
+async function mockCommand(command, _args) {
   switch (command) {
     case 'get_launcher_dir':
       return Promise.resolve('/mock/minecrack');
@@ -301,7 +373,19 @@ function mockCommand(command, _args) {
       return Promise.resolve('/mock/path');
     case 'export_instance':
       return Promise.resolve({ path: '/mock/instance-backup.zip', size_bytes: 52428800, items_count: 15 });
-    case 'inspect_instance_folder':
+    case 'inspect_instance_folder': {
+      const folderPath = _args.folderPath;
+
+      // Buscar en datos de referencia por nombre de carpeta
+      for (const [key, data] of Object.entries(DEV_REFERENCE_DATA)) {
+        if (folderPath.includes(key)) {
+          console.log(`[mock] inspect_instance_folder - usando datos de referencia para "${key}":`, data);
+          return Promise.resolve(data);
+        }
+      }
+
+      // Fallback a mock genérico
+      console.log('[mock] inspect_instance_folder - usando mock genérico');
       return Promise.resolve({
         name: 'MyInstance',
         version: '1.20.1',
@@ -309,7 +393,31 @@ function mockCommand(command, _args) {
         modsCount: 5,
         hasMetadata: true,
       });
-    case 'inspect_instance_zip':
+    }
+    case 'inspect_instance_zip': {
+      const zipPath = _args.zipPath;
+
+      // Buscar en datos de referencia por nombre de archivo
+      for (const [key, data] of Object.entries(DEV_REFERENCE_DATA)) {
+        if (zipPath.includes(key)) {
+          console.log(`[mock] inspect_instance_zip - usando datos de referencia para "${key}":`, data);
+          return Promise.resolve(data);
+        }
+      }
+
+      // Intentar inspeccionar el ZIP real si está disponible
+      try {
+        const realData = await inspectZipFile(zipPath);
+        if (realData) {
+          console.log('[mock] inspect_instance_zip - datos reales del ZIP:', realData);
+          return Promise.resolve(realData);
+        }
+      } catch (err) {
+        console.warn('[mock] Error inspeccionando ZIP real:', err.message);
+      }
+
+      // Fallback a mock genérico
+      console.log('[mock] inspect_instance_zip - usando mock genérico');
       return Promise.resolve({
         name: 'MyInstance',
         version: '1.20.1',
@@ -317,6 +425,7 @@ function mockCommand(command, _args) {
         modsCount: 5,
         hasMetadata: true,
       });
+    }
     case 'import_instance_from_folder':
       return Promise.resolve({ newInstanceId: 'new-uuid-1234', imported: 5 });
     case 'import_instance_from_zip':

@@ -1,0 +1,9 @@
+{
+  "TINKERS-CREATE": {
+    "name": "TINKERS-CREATE",
+    "version": "1.19.2",
+    "loader": "forge",
+    "modsCount": 79,
+    "hasMetadata": true
+  }
+}

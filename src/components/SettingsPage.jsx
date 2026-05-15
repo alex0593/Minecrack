@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { detectJava, pickFile, pickFolder, getLauncherDir } from '../lib/tauri';
 import './SettingsPage.css';
@@ -94,11 +94,12 @@ export default function SettingsPage() {
   const [jvmArgs,     setJvmArgs]     = useState(config.defaultJvmArgs ?? '');
   const [accentColor, setAccentColor] = useState(config.accentColor ?? '#00e676');
 
-  const [javaInfo,    setJavaInfo]    = useState(null);   // { version, major_version }
+  const [javaInfo,    setJavaInfo]    = useState(null);
   const [detecting,   setDetecting]   = useState(false);
   const [saved,       setSaved]       = useState(false);
+  const mountedRef = useRef(false);
 
-  // Sync state if config changes externally
+  // Sync state cuando la config cambia externamente (p.ej. al cargar desde disco)
   useEffect(() => {
     setJavaPath(config.javaPath    ?? '');
     setGameDir( config.gameDir     ?? '');
@@ -108,31 +109,24 @@ export default function SettingsPage() {
     setAccentColor(config.accentColor ?? '#00e676');
   }, [config]);
 
-  // Apply theme class to document
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+  // Nota: el tema y accent color se aplican globalmente en App.jsx (useThemeSync).
+  // Aquí solo persistimos al store para que se guarden en disco.
 
-  // Apply accent color to CSS variable (with proper RGB extraction)
+  // Auto-guardar tema y accent al cambiar (evitar dispatch en el primer render)
   useEffect(() => {
+    if (!mountedRef.current) return;
+    dispatch({ type: 'UPDATE_CONFIG', payload: { theme } });
+  }, [theme]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!mountedRef.current) return;
     if (accentColor && /^#[0-9A-F]{6}$/i.test(accentColor)) {
-      try {
-        const r = parseInt(accentColor.slice(1, 3), 16);
-        const g = parseInt(accentColor.slice(3, 5), 16);
-        const b = parseInt(accentColor.slice(5, 7), 16);
-
-        document.documentElement.style.setProperty('--accent', accentColor);
-        document.documentElement.style.setProperty('--accent-dim', accentColor);
-        document.documentElement.style.setProperty('--text-accent', accentColor);
-        document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.15)`);
-        document.documentElement.style.setProperty('--accent-glow-strong', `rgba(${r}, ${g}, ${b}, 0.35)`);
-        document.documentElement.style.setProperty('--border-accent', `rgba(${r}, ${g}, ${b}, 0.3)`);
-        document.documentElement.style.setProperty('--shadow-accent', `0 0 20px rgba(${r}, ${g}, ${b}, 0.2)`);
-      } catch (err) {
-        console.warn('[SettingsPage] Error applying accent color:', err);
-      }
+      dispatch({ type: 'UPDATE_CONFIG', payload: { accentColor } });
     }
-  }, [accentColor]);
+  }, [accentColor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Marcar como montado tras el primer ciclo
+  useEffect(() => { mountedRef.current = true; }, []);
 
   const save = () => {
     dispatch({

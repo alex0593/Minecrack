@@ -2,14 +2,20 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import './MainPanel.css';
 import { useStore } from '../store';
 import { LOADERS } from '../lib/instances';
-import { listMods, deleteMod, toggleMod, getLauncherDir, exportInstanceMods, importInstanceMods, inspectModsZip, ensureDir } from '../lib/tauri';
+import { listMods, deleteMod, toggleMod, getLauncherDir, exportInstanceMods, importInstanceMods, inspectModsZip, ensureDir,
+  listResourcePacks, addResourcePack, deleteResourcePack,
+  listShaderPacks, addShaderPack, deleteShaderPack,
+  pickFile,
+} from '../lib/tauri';
 import { formatPlaytime, formatRelativeTime, formatLogTime } from '../lib/format';
 import ImportModsModal from './ImportModsModal';
 import ExportInstanceModal from './ExportInstanceModal';
-import ModpackBrowser from './ModpackBrowser';
 import SettingsPage from './SettingsPage';
 
 /* ─── Helpers ─────────────────────────────────── */
+const fmtModVersion = (v) =>
+  !v || v === 'unknown' || v === 'N/A' || v.includes('${') ? null : v;
+
 const loaderBadge = (loader) => {
   const l = LOADERS.find(x => x.id === loader);
   return l ? <span className={`badge ${l.color}`}>{l.label}</span> : null;
@@ -46,12 +52,120 @@ function WelcomeView() {
   );
 }
 
+/* ─── Pack Tab (Resource Packs / Shaders) ────── */
+function PacksTab({ instance, type }) {
+  const [packs, setPacks]     = useState([]);
+  const [loading, setLoading] = useState(false);
+  const { openModal } = useStore();
+
+  const listFn   = type === 'resourcepacks' ? listResourcePacks : listShaderPacks;
+  const addFn    = type === 'resourcepacks' ? addResourcePack   : addShaderPack;
+  const deleteFn = type === 'resourcepacks' ? deleteResourcePack : deleteShaderPack;
+  const label    = type === 'resourcepacks' ? 'Resource Packs' : 'Shaderpacks';
+  const icon     = type === 'resourcepacks' ? '🎨' : '✨';
+  const modalName = type === 'resourcepacks' ? 'resourcePackBrowser' : 'shaderPackBrowser';
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const dir = await getLauncherDir();
+      const list = await listFn(dir, instance.id);
+      setPacks(list);
+    } catch (err) {
+      console.error(`[PacksTab] Error cargando ${label}:`, err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [instance.id]);
+
+  const handleAdd = async () => {
+    try {
+      const filePath = await pickFile({
+        title: `Seleccionar ${label}`,
+        filters: [{ name: 'Pack (ZIP)', extensions: ['zip'] }],
+      });
+      if (!filePath) return;
+      const dir = await getLauncherDir();
+      await addFn(dir, instance.id, filePath);
+      await load();
+    } catch (err) {
+      console.error(`[PacksTab] Error agregando:`, err);
+    }
+  };
+
+  const handleDelete = async (filename) => {
+    try {
+      const dir = await getLauncherDir();
+      await deleteFn(dir, instance.id, filename);
+      await load();
+    } catch (err) {
+      console.error(`[PacksTab] Error eliminando:`, err);
+    }
+  };
+
+  const handleSearchOnline = () => {
+    openModal(modalName, { instanceId: instance.id });
+  };
+
+  return (
+    <div>
+      <div className="mods-header">
+        <h3>{icon} {label} ({packs.length})</h3>
+        <div style={{ display: 'flex', gap: 'var(--gap-sm)' }}>
+          <button className="btn btn-primary btn-sm" onClick={handleSearchOnline} disabled={loading}>
+            🔍 Buscar en línea
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={handleAdd} disabled={loading}>
+            + Agregar local
+          </button>
+        </div>
+      </div>
+      {packs.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-illustration">{icon}</div>
+          <h3 className="empty-state-title">Sin {label.toLowerCase()}</h3>
+          <p className="empty-state-desc">
+            Agrega {type === 'resourcepacks' ? 'texture packs o resource packs' : 'shaders (Iris/OptiFine)'} en formato ZIP.
+          </p>
+          <button className="empty-state-cta empty-state-cta-primary" onClick={handleAdd}>
+            {icon} Agregar {label}
+          </button>
+        </div>
+      ) : (
+        <div className="mods-list" style={{ marginTop: 12 }}>
+          {packs.map(pack => (
+            <div key={pack.filename} className="mod-row">
+              <div className="mod-row-icon">{icon}</div>
+              <div className="mod-row-info">
+                <div className="mod-row-name">{pack.name}</div>
+                <div className="mod-row-version">{pack.filename}</div>
+              </div>
+              <div className="mod-row-actions">
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => handleDelete(pack.filename)}
+                >✕ Quitar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Mods Tab ────────────────────────────────── */
 function ModsTab({ instance }) {
   const { state, dispatch, openModal } = useStore();
   const mods = state.instanceMods ?? [];
   const [loading, setLoading] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [expandedMod, setExpandedMod] = useState(null); // filename del mod expandido
+
+  // Sub-tabs: 'mods' | 'resourcepacks' | 'shaderpacks'
+  const [subTab, setSubTab] = useState('mods');
 
   // View mode: 'grid' | 'list' | 'compact' — persisted in localStorage
   const [viewMode, setViewMode] = useState(() => {
@@ -123,6 +237,27 @@ function ModsTab({ instance }) {
 
   return (
     <div>
+      {/* Sub-tabs */}
+      <div className="mods-subtabs">
+        {[
+          { id: 'mods',         label: `🧩 Mods (${mods.length})` },
+          { id: 'resourcepacks', label: '🎨 Resource Packs' },
+          { id: 'shaderpacks',   label: '✨ Shaders' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            className={`mods-subtab${subTab === tab.id ? ' active' : ''}`}
+            onClick={() => setSubTab(tab.id)}
+          >{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Resource Packs tab */}
+      {subTab === 'resourcepacks' && <PacksTab instance={instance} type="resourcepacks" />}
+      {subTab === 'shaderpacks'   && <PacksTab instance={instance} type="shaderpacks"   />}
+
+      {/* Mods tab */}
+      {subTab === 'mods' && <div>
       <div className="mods-header">
         <h3>Mods instalados ({mods.length})</h3>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -234,72 +369,87 @@ function ModsTab({ instance }) {
           : 'mods-compact'
         }>
           {mods.map(mod => {
+            const isExpanded = expandedMod === mod.filename;
+
             if (viewMode === 'compact') {
               return (
-                <div key={mod.filename} className={`mod-row-compact${!mod.enabled ? ' disabled' : ''}`}>
-                  <span className={`mod-compact-dot${!mod.enabled ? ' off' : ''}`} />
-                  <span className="mod-compact-name">{mod.name}</span>
-                  <span className="mod-compact-version">{mod.version}</span>
-                  <div className="mod-compact-actions">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => handleToggle(mod.filename, mod.enabled)}
-                    >
-                      {mod.enabled ? '🔒' : '🔓'}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDelete(mod.filename)}
-                    >✕</button>
+                <div key={mod.filename}>
+                  <div
+                    className={`mod-row-compact${!mod.enabled ? ' disabled' : ''}`}
+                    onClick={() => setExpandedMod(isExpanded ? null : mod.filename)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <span className={`mod-compact-dot${!mod.enabled ? ' off' : ''}`} />
+                    <span className="mod-compact-name">{mod.name}</span>
+                    {fmtModVersion(mod.version) && <span className="mod-compact-version">{fmtModVersion(mod.version)}</span>}
+                    <div className="mod-compact-actions" onClick={e => e.stopPropagation()}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => handleToggle(mod.filename, mod.enabled)}>
+                        {mod.enabled ? '🔒' : '🔓'}
+                      </button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(mod.filename)}>✕</button>
+                    </div>
                   </div>
+                  {isExpanded && mod.description && (
+                    <div className="mod-description-panel">{mod.description}</div>
+                  )}
+                  {isExpanded && !mod.description && (
+                    <div className="mod-description-panel mod-description-empty">Sin descripción disponible</div>
+                  )}
                 </div>
               );
             }
 
             if (viewMode === 'list') {
               return (
-                <div key={mod.filename} className={`mod-row${!mod.enabled ? ' disabled' : ''}`}>
-                  <div className="mod-row-icon">{mod.enabled ? '🧩' : '⊘'}</div>
-                  <div className="mod-row-info">
-                    <div className="mod-row-name">{mod.name}</div>
-                    <div className="mod-row-version">{mod.version}</div>
+                <div key={mod.filename}>
+                  <div
+                    className={`mod-row${!mod.enabled ? ' disabled' : ''}`}
+                    onClick={() => setExpandedMod(isExpanded ? null : mod.filename)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="mod-row-icon">{mod.enabled ? '🧩' : '⊘'}</div>
+                    <div className="mod-row-info">
+                      <div className="mod-row-name">{mod.name}</div>
+                      {fmtModVersion(mod.version) && <div className="mod-row-version">{fmtModVersion(mod.version)}</div>}
+                    </div>
+                    <div className="mod-row-actions" onClick={e => e.stopPropagation()}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => handleToggle(mod.filename, mod.enabled)}>
+                        {mod.enabled ? '🔒 Desactivar' : '🔓 Activar'}
+                      </button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(mod.filename)}>✕ Quitar</button>
+                    </div>
                   </div>
-                  <div className="mod-row-actions">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => handleToggle(mod.filename, mod.enabled)}
-                    >
-                      {mod.enabled ? '🔒 Desactivar' : '🔓 Activar'}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDelete(mod.filename)}
-                    >✕ Quitar</button>
-                  </div>
+                  {isExpanded && (
+                    <div className={`mod-description-panel${!mod.description ? ' mod-description-empty' : ''}`}>
+                      {mod.description || 'Sin descripción disponible'}
+                    </div>
+                  )}
                 </div>
               );
             }
 
             // Default: grid
             return (
-              <div key={mod.filename} className={`mod-card${!mod.enabled ? ' disabled' : ''}`}>
+              <div
+                key={mod.filename}
+                className={`mod-card${!mod.enabled ? ' disabled' : ''}${isExpanded ? ' expanded' : ''}`}
+                onClick={() => setExpandedMod(isExpanded ? null : mod.filename)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="mod-icon-box">{mod.enabled ? '🧩' : '⊘'}</div>
                 <div className="mod-info">
                   <div className="mod-name">{mod.name}</div>
-                  <div className="mod-desc">{mod.version}</div>
-                  <div className="mod-actions">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => handleToggle(mod.filename, mod.enabled)}
-                    >
+                  {fmtModVersion(mod.version) && <div className="mod-desc">{fmtModVersion(mod.version)}</div>}
+                  {isExpanded && (
+                    <div className="mod-expanded-desc">
+                      {mod.description || 'Sin descripción disponible'}
+                    </div>
+                  )}
+                  <div className="mod-actions" onClick={e => e.stopPropagation()}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleToggle(mod.filename, mod.enabled)}>
                       {mod.enabled ? '🔒 Desactivar' : '🔓 Activar'}
                     </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDelete(mod.filename)}
-                    >
-                      ✕ Quitar
-                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(mod.filename)}>✕ Quitar</button>
                   </div>
                 </div>
               </div>
@@ -307,12 +457,73 @@ function ModsTab({ instance }) {
           })}
         </div>
       )}
+      </div>}
     </div>
   );
 }
 
 /* ─── Stats Tab ───────────────────────────────── */
 function StatsTab({ instance }) {
+  const { dispatch } = useStore();
+  const [repairing, setRepairing] = useState(false);
+  const [repairStatus, setRepairStatus] = useState('');
+
+  const canReinstallLoader = instance.loader === 'forge' || instance.loader === 'neoforge';
+
+  async function handleReinstallLoader() {
+    if (!confirm(`Esto re-descargará todas las librerías de ${instance.loader}. ¿Continuar?`)) return;
+    setRepairing(true);
+    setRepairStatus('Iniciando reparación…');
+    try {
+      const { deleteFile } = await import('../lib/tauri');
+      const { installLoader } = await import('../lib/loaders');
+      const { downloadQueue } = await import('../lib/downloader');
+      const { readFile, getLauncherDir } = await import('../lib/tauri');
+      const { LAUNCHER } = await import('../config');
+
+      const launcherDir = await getLauncherDir();
+      const profileId = instance.loader === 'forge'
+        ? instance.loaderVersion
+        : `${instance.version}-${instance.loader}-${instance.loaderVersion}`;
+      const profilePath = `${launcherDir}/versions/${profileId}/${profileId}.json`;
+
+      // Cargar versionData vanilla (necesario para installLoader)
+      const vanillaJson = await readFile(`${launcherDir}/versions/${instance.version}/${instance.version}.json`);
+      const versionData = JSON.parse(vanillaJson);
+
+      setRepairStatus('Borrando perfil antiguo…');
+      try { await deleteFile(profilePath); } catch { /* ok si no existe */ }
+
+      setRepairStatus(`Regenerando perfil de ${instance.loader}…`);
+      const result = await installLoader(
+        instance.loader, instance.loaderVersion, instance.version, launcherDir, versionData
+      );
+
+      if (result.downloadTasks?.length > 0) {
+        setRepairStatus(`Descargando ${result.downloadTasks.length} archivos…`);
+        await new Promise((resolve, reject) => {
+          const q = downloadQueue({
+            tasks: result.downloadTasks,
+            concurrency: LAUNCHER.MAX_CONCURRENT_DOWNLOADS,
+            onProgress: (p) => setRepairStatus(`Descargando ${p.done}/${p.total}: ${p.label}`),
+            onDone: ({ failed }) => failed > 0
+              ? reject(new Error(`${failed} archivos fallaron`))
+              : resolve(),
+          });
+          q.run();
+        });
+      }
+
+      setRepairStatus('✓ Reparación completada');
+      setTimeout(() => { setRepairing(false); setRepairStatus(''); }, 1500);
+    } catch (err) {
+      console.error('[Reinstall] Error:', err);
+      setRepairStatus(`✗ Error: ${err.message || err}`);
+      dispatch({ type: 'SET_ERROR', payload: err.message || String(err) });
+      setTimeout(() => { setRepairing(false); setRepairStatus(''); }, 3000);
+    }
+  }
+
   return (
     <div>
       <div className="stats-grid">
@@ -330,6 +541,30 @@ function StatsTab({ instance }) {
           </div>
         ))}
       </div>
+
+      {canReinstallLoader && (
+        <div style={{ marginTop: 24, padding: 16, border: '1px solid var(--border)', borderRadius: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+            🔧 Reparación del loader
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+            Si tienes errores como <code>ClassNotFoundException</code> al lanzar,
+            re-instala el loader para descargar archivos faltantes.
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleReinstallLoader}
+            disabled={repairing}
+          >
+            {repairing ? '⏳ Reparando…' : `🔄 Reinstalar ${instance.loader}`}
+          </button>
+          {repairStatus && (
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+              {repairStatus}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -710,14 +945,6 @@ export default function MainPanel() {
     return (
       <main className="main-panel">
         <SettingsPage />
-      </main>
-    );
-  }
-
-  if (activeTab === 'mods') {
-    return (
-      <main className="main-panel">
-        <ModpackBrowser />
       </main>
     );
   }

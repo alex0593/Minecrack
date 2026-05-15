@@ -19,21 +19,200 @@ const DEV_REFERENCE_DATA = {
     version: '1.20.1',
     loader: 'fabric',
     modsCount: 5,
-    hasMetadata: true
+    hasMetadata: true,
+    mods: [] // Sin mods para el mock genérico
   },
   'TINKERS-CREATE': { // Para el ZIP específico de referencia
     name: 'TINKERS-CREATE',
     version: '1.19.2',
     loader: 'forge',
-    modsCount: 79,
-    hasMetadata: true
+    modsCount: 87,
+    hasMetadata: true,
+    mods: [ // Lista completa de 87 mods a descargar desde CurseForge
+      { projectID: 831663, fileID: 4894788 },
+      { projectID: 526901, fileID: 4765726 },
+      { projectID: 1028108, fileID: 6069349 },
+      { projectID: 250898, fileID: 3983796 },
+      { projectID: 256717, fileID: 4153347 },
+      { projectID: 445274, fileID: 6375704 },
+      { projectID: 429371, fileID: 4842873 },
+      { projectID: 627557, fileID: 6515577 },
+      { projectID: 549225, fileID: 5692394 },
+      { projectID: 820727, fileID: 5385872 },
+      { projectID: 470193, fileID: 4764733 },
+      { projectID: 426558, fileID: 4159154 },
+      { projectID: 250419, fileID: 4277356 },
+      { projectID: 238551, fileID: 5794077 },
+      { projectID: 429235, fileID: 4117906 },
+      { projectID: 832882, fileID: 4882269 },
+      { projectID: 655608, fileID: 5739558 },
+      { projectID: 1005386, fileID: 6169606 },
+      { projectID: 935929, fileID: 6693811 },
+      { projectID: 422301, fileID: 5194759 },
+      { projectID: 659674, fileID: 5736626 },
+      { projectID: 688231, fileID: 5798092 },
+      { projectID: 250498, fileID: 5180680 },
+      { projectID: 244844, fileID: 5454641 },
+      { projectID: 582327, fileID: 4876162 },
+      { projectID: 377835, fileID: 5213308 },
+      { projectID: 908741, fileID: 5539178 },
+      { projectID: 228525, fileID: 4556697 },
+      { projectID: 951499, fileID: 5551626 },
+      { projectID: 649832, fileID: 5210991 },
+      { projectID: 899386, fileID: 5682314 },
+      { projectID: 916747, fileID: 5175975 },
+      { projectID: 442508, fileID: 4151747 },
+      { projectID: 947914, fileID: 6160382 },
+      { projectID: 367178, fileID: 5141422 },
+      { projectID: 1061749, fileID: 5771389 },
+      { projectID: 351264, fileID: 4513187 },
+      { projectID: 328085, fileID: 5797604 },
+      { projectID: 688768, fileID: 5342348 },
+      { projectID: 309927, fileID: 5843737 },
+      { projectID: 326652, fileID: 5170313 },
+      { projectID: 872577, fileID: 4714432 },
+      { projectID: 74072, fileID: 6044827 },
+      { projectID: 1084662, fileID: 7059564 },
+      { projectID: 238222, fileID: 5106178 },
+      { projectID: 439890, fileID: 5099757 },
+      { projectID: 977947, fileID: 5890386 },
+      { projectID: 686911, fileID: 6312263 },
+      { projectID: 646668, fileID: 5812622 },
+      { projectID: 1088877, fileID: 5656711 },
+      { projectID: 238086, fileID: 5408722 },
+      { projectID: 551736, fileID: 4285414 },
+      { projectID: 1139062, fileID: 6201439 },
+      { projectID: 531761, fileID: 4751735 },
+      { projectID: 541617, fileID: 4645830 },
+      { projectID: 239197, fileID: 6256046 },
+      { projectID: 388172, fileID: 4407241 },
+      { projectID: 74924, fileID: 6044700 },
+      { projectID: 1166149, fileID: 6122872 },
+      { projectID: 882495, fileID: 4621015 },
+      { projectID: 854949, fileID: 7471527 },
+      { projectID: 32274, fileID: 5208387 },
+      { projectID: 1065328, fileID: 5635845 },
+      { projectID: 1007404, fileID: 5794766 },
+      { projectID: 342584, fileID: 5460518 },
+      { projectID: 558905, fileID: 4632201 },
+      { projectID: 884944, fileID: 5778892 },
+      { projectID: 619320, fileID: 7863153 },
+      { projectID: 709416, fileID: 5630037 },
+      { projectID: 245755, fileID: 4943265 },
+      { projectID: 551520, fileID: 5100224 },
+      { projectID: 398521, fileID: 5051241 },
+      { projectID: 419699, fileID: 5137942 },
+      { projectID: 437717, fileID: 6147807 },
+      { projectID: 618298, fileID: 5870031 },
+      { projectID: 248787, fileID: 3872808 },
+      { projectID: 1062174, fileID: 5707487 },
+      { projectID: 551894, fileID: 4441760 },
+      { projectID: 1022944, fileID: 5472390 },
+      { projectID: 318833, fileID: 5703594 },
+      { projectID: 1084197, fileID: 6844333 },
+      { projectID: 416294, fileID: 4953345 },
+      { projectID: 626761, fileID: 4086903 },
+      { projectID: 931925, fileID: 5344502 },
+      { projectID: 1102591, fileID: 6647356 },
+      { projectID: 978748, fileID: 5342814 },
+      { projectID: 331936, fileID: 4556677 }
+    ]
   },
   'TINKERS-CREATE.zip': {
     name: 'TINKERS-CREATE',
     version: '1.19.2',
     loader: 'forge',
-    modsCount: 79,
-    hasMetadata: true
+    modsCount: 87,
+    hasMetadata: true,
+    mods: [ // Misma lista que arriba
+      { projectID: 831663, fileID: 4894788 },
+      { projectID: 526901, fileID: 4765726 },
+      { projectID: 1028108, fileID: 6069349 },
+      { projectID: 250898, fileID: 3983796 },
+      { projectID: 256717, fileID: 4153347 },
+      { projectID: 445274, fileID: 6375704 },
+      { projectID: 429371, fileID: 4842873 },
+      { projectID: 627557, fileID: 6515577 },
+      { projectID: 549225, fileID: 5692394 },
+      { projectID: 820727, fileID: 5385872 },
+      { projectID: 470193, fileID: 4764733 },
+      { projectID: 426558, fileID: 4159154 },
+      { projectID: 250419, fileID: 4277356 },
+      { projectID: 238551, fileID: 5794077 },
+      { projectID: 429235, fileID: 4117906 },
+      { projectID: 832882, fileID: 4882269 },
+      { projectID: 655608, fileID: 5739558 },
+      { projectID: 1005386, fileID: 6169606 },
+      { projectID: 935929, fileID: 6693811 },
+      { projectID: 422301, fileID: 5194759 },
+      { projectID: 659674, fileID: 5736626 },
+      { projectID: 688231, fileID: 5798092 },
+      { projectID: 250498, fileID: 5180680 },
+      { projectID: 244844, fileID: 5454641 },
+      { projectID: 582327, fileID: 4876162 },
+      { projectID: 377835, fileID: 5213308 },
+      { projectID: 908741, fileID: 5539178 },
+      { projectID: 228525, fileID: 4556697 },
+      { projectID: 951499, fileID: 5551626 },
+      { projectID: 649832, fileID: 5210991 },
+      { projectID: 899386, fileID: 5682314 },
+      { projectID: 916747, fileID: 5175975 },
+      { projectID: 442508, fileID: 4151747 },
+      { projectID: 947914, fileID: 6160382 },
+      { projectID: 367178, fileID: 5141422 },
+      { projectID: 1061749, fileID: 5771389 },
+      { projectID: 351264, fileID: 4513187 },
+      { projectID: 328085, fileID: 5797604 },
+      { projectID: 688768, fileID: 5342348 },
+      { projectID: 309927, fileID: 5843737 },
+      { projectID: 326652, fileID: 5170313 },
+      { projectID: 872577, fileID: 4714432 },
+      { projectID: 74072, fileID: 6044827 },
+      { projectID: 1084662, fileID: 7059564 },
+      { projectID: 238222, fileID: 5106178 },
+      { projectID: 439890, fileID: 5099757 },
+      { projectID: 977947, fileID: 5890386 },
+      { projectID: 686911, fileID: 6312263 },
+      { projectID: 646668, fileID: 5812622 },
+      { projectID: 1088877, fileID: 5656711 },
+      { projectID: 238086, fileID: 5408722 },
+      { projectID: 551736, fileID: 4285414 },
+      { projectID: 1139062, fileID: 6201439 },
+      { projectID: 531761, fileID: 4751735 },
+      { projectID: 541617, fileID: 4645830 },
+      { projectID: 239197, fileID: 6256046 },
+      { projectID: 388172, fileID: 4407241 },
+      { projectID: 74924, fileID: 6044700 },
+      { projectID: 1166149, fileID: 6122872 },
+      { projectID: 882495, fileID: 4621015 },
+      { projectID: 854949, fileID: 7471527 },
+      { projectID: 32274, fileID: 5208387 },
+      { projectID: 1065328, fileID: 5635845 },
+      { projectID: 1007404, fileID: 5794766 },
+      { projectID: 342584, fileID: 5460518 },
+      { projectID: 558905, fileID: 4632201 },
+      { projectID: 884944, fileID: 5778892 },
+      { projectID: 619320, fileID: 7863153 },
+      { projectID: 709416, fileID: 5630037 },
+      { projectID: 245755, fileID: 4943265 },
+      { projectID: 551520, fileID: 5100224 },
+      { projectID: 398521, fileID: 5051241 },
+      { projectID: 419699, fileID: 5137942 },
+      { projectID: 437717, fileID: 6147807 },
+      { projectID: 618298, fileID: 5870031 },
+      { projectID: 248787, fileID: 3872808 },
+      { projectID: 1062174, fileID: 5707487 },
+      { projectID: 551894, fileID: 4441760 },
+      { projectID: 1022944, fileID: 5472390 },
+      { projectID: 318833, fileID: 5703594 },
+      { projectID: 1084197, fileID: 6844333 },
+      { projectID: 416294, fileID: 4953345 },
+      { projectID: 626761, fileID: 4086903 },
+      { projectID: 931925, fileID: 5344502 },
+      { projectID: 1102591, fileID: 6647356 },
+      { projectID: 978748, fileID: 5342814 },
+      { projectID: 331936, fileID: 4556677 }
+    ]
   }
 };
 
@@ -87,6 +266,19 @@ export const readFile = async (path) => {
     throw new Error(`No se pudo leer ${path}: ${err?.message || err?.toString?.() || 'error desconocido'}`);
   }
 };
+
+/** Lee un archivo binario y retorna su contenido como string base64 */
+export const readFileBase64 = (path) => tauriCmd('read_file_base64', { path });
+
+/** Borra un archivo (no-op si no existe) */
+export const deleteFile = (path) => tauriCmd('delete_file', { path });
+
+/** Escribe un archivo binario desde un string base64 (sin prefijo `data:`) */
+export const writeFileBase64 = (path, contentBase64) =>
+  tauriCmd('write_file_base64', { path, contentBase64 });
+
+/** Copia un archivo de src a dest (binario, preserva contenido) */
+export const copyFile = (src, dest) => tauriCmd('copy_file', { src, dest });
 
 /**
  * Verifica si un archivo existe. Si se pasa sha1, valida también el hash.
@@ -261,8 +453,45 @@ export const importInstanceFromFolder = (launcherDir, folderPath, newName) =>
 export const importInstanceFromZip = (launcherDir, zipPath, newName) =>
   tauriCmd('import_instance_from_zip', { launcherDir, zipPath, newName });
 
+/**
+ * Obtiene lista de mods a descargar para una instancia importada
+ * @returns {Promise<Array<{projectID, fileID, name}>>}
+ */
+export const getModsToDownload = (instancePath) =>
+  tauriCmd('get_mods_to_download', { instancePath });
+
 // ─────────────────────────────────────────────────────────────────────────────
-// (ZIP inspection utilities not available in browser - use reference data instead)
+// Fix 4: Resource Packs
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const listResourcePacks = (launcherDir, instanceId) =>
+  tauriCmd('list_resourcepacks', { launcherDir, instanceId });
+
+export const addResourcePack = (launcherDir, instanceId, srcPath) =>
+  tauriCmd('add_resourcepack', { launcherDir, instanceId, srcPath });
+
+export const deleteResourcePack = (launcherDir, instanceId, filename) =>
+  tauriCmd('delete_resourcepack', { launcherDir, instanceId, filename });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fix 4: Shaderpacks
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const listShaderPacks = (launcherDir, instanceId) =>
+  tauriCmd('list_shaderpacks', { launcherDir, instanceId });
+
+export const addShaderPack = (launcherDir, instanceId, srcPath) =>
+  tauriCmd('add_shaderpack', { launcherDir, instanceId, srcPath });
+
+export const deleteShaderPack = (launcherDir, instanceId, filename) =>
+  tauriCmd('delete_shaderpack', { launcherDir, instanceId, filename });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fix 4/5: create_dir_all
+// ─────────────────────────────────────────────────────────────────────────────
+export const createDirAll = (path) =>
+  tauriCmd('create_dir_all', { path });
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -373,9 +602,58 @@ async function mockCommand(command, _args) {
       });
     }
     case 'import_instance_from_folder':
-      return Promise.resolve({ newInstanceId: 'new-uuid-1234', imported: 5 });
+      return Promise.resolve({
+        newInstanceId: 'new-uuid-1234',
+        name: 'Imported Instance',
+        version: '1.20.1',
+        loader: 'fabric',
+        loaderVersion: '0.15.0'
+      });
     case 'import_instance_from_zip':
-      return Promise.resolve({ newInstanceId: 'new-uuid-1234', imported: 5 });
+      return Promise.resolve({
+        newInstanceId: 'new-uuid-1234',
+        name: 'Imported Instance',
+        version: '1.20.1',
+        loader: 'fabric',
+        loaderVersion: '0.15.0'
+      });
+    case 'get_mods_to_download': {
+      // Buscar datos de referencia por ruta de instancia
+      for (const [key, data] of Object.entries(DEV_REFERENCE_DATA)) {
+        if (_args.instancePath && _args.instancePath.includes(key)) {
+          if (data.mods && data.mods.length > 0) {
+            console.log(`[mock] get_mods_to_download - retornando ${data.mods.length} mods para ${key}`);
+            return Promise.resolve(data.mods);
+          }
+        }
+      }
+      // Fallback: retornar lista vacía si no hay datos de referencia
+      console.log('[mock] get_mods_to_download - usando lista vacía');
+      return Promise.resolve([]);
+    }
+    // Fix 4: Resource packs & shaderpacks mocks
+    case 'list_resourcepacks':
+      return Promise.resolve([]);
+    case 'add_resourcepack':
+      return Promise.resolve({ filename: 'mock-resourcepack.zip', name: 'mock-resourcepack' });
+    case 'delete_resourcepack':
+      return Promise.resolve();
+    case 'list_shaderpacks':
+      return Promise.resolve([]);
+    case 'add_shaderpack':
+      return Promise.resolve({ filename: 'mock-shaderpack.zip', name: 'mock-shaderpack' });
+    case 'delete_shaderpack':
+      return Promise.resolve();
+    case 'create_dir_all':
+      return Promise.resolve();
+    case 'read_file_base64':
+      return Promise.reject(new Error('read_file_base64: no disponible en browser'));
+    case 'delete_file':
+      return Promise.resolve();
+    case 'write_file_base64':
+      return Promise.resolve();
+    case 'copy_file':
+      return Promise.resolve();
     default:
       return Promise.reject(new Error(`Comando "${command}" no reconocido`));
   }

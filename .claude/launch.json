@@ -1,11 +1,11 @@
-{
+﻿{
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "minecrack-dev",
+      "name": "vite",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 1420
+      "runtimeArgs": ["run", "dev", "--", "--port", "1421"],
+      "port": 1421
     }
   ]
 }

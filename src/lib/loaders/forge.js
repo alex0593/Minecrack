@@ -69,20 +69,28 @@ export async function getForgeVersions(gameVersion) {
  * Versiones de Forge conocidas con disponibilidad confirmada
  * Se usa como fallback si la API no responde
  */
+// Tabla de versiones más recientes/estables conocidas (actualizada periódicamente
+// desde meta.prismlauncher.org). Solo se usa como último fallback si Prism y la
+// API directa de Forge fallan.
 export const KNOWN_FORGE_VERSIONS = {
-  '1.21.1': '1.21.1-52.0.10',
+  '1.21.4': '1.21.4-54.1.16',
+  '1.21.3': '1.21.3-53.1.10',
+  '1.21.1': '1.21.1-52.1.14',
   '1.21':   '1.21-51.0.33',
-  '1.20.6': '1.20.6-50.1.6',
-  '1.20.4': '1.20.4-49.1.0',
+  '1.20.6': '1.20.6-50.2.8',
+  '1.20.4': '1.20.4-49.2.7',
   '1.20.2': '1.20.2-48.1.0',
-  '1.20.1': '1.20.1-47.3.12',
-  '1.19.4': '1.19.4-45.3.0',
-  '1.19.2': '1.19.2-43.4.8',
-  '1.18.2': '1.18.2-40.3.9',
+  '1.20.1': '1.20.1-47.4.20',
+  '1.19.4': '1.19.4-45.4.3',
+  '1.19.2': '1.19.2-43.5.2',
+  '1.18.2': '1.18.2-40.3.12',
   '1.17.1': '1.17.1-37.1.1',
-  '1.16.5': '1.16.5-36.2.39',
-  '1.15.2': '1.15.2-31.2.57',
-  '1.14.4': '1.14.4-28.2.26',
+  '1.16.5': '1.16.5-36.2.42',
+  '1.15.2': '1.15.2-31.2.60',
+  '1.14.4': '1.14.4-28.2.28',
+  '1.12.2': '1.12.2-14.23.5.2864',
+  '1.8.9':  '1.8.9-11.15.1.2318',
+  '1.7.10': '1.7.10-10.13.4.1614',
 };
 
 /**
@@ -143,18 +151,74 @@ export async function findCompatibleForgeVersion(gameVersion) {
  * @param {object|null} prismData  - Datos de Prism Meta para esta versión (puede ser null)
  * @returns {object} JSON del perfil de Forge compatible con el launcher
  */
+// Convierte "group:artifact:version" o "group:artifact:version:classifier" al path Maven relativo
+// Ejemplos:
+//   org.ow2.asm:asm:9.9 → org/ow2/asm/asm/9.9/asm-9.9.jar
+//   net.minecraftforge:forge:1.19.2-43.2.14:installer → net/minecraftforge/forge/1.19.2-43.2.14/forge-1.19.2-43.2.14-installer.jar
+function nameToMavenPath(name) {
+  const parts = name.split(':');
+  if (parts.length < 3) return null;
+
+  const [group, artifact, version, classifier] = parts;
+  const groupPath = group.replace(/\./g, '/');
+
+  // Si hay clasificador, incluirlo en el nombre del JAR
+  if (classifier) {
+    return `${groupPath}/${artifact}/${version}/${artifact}-${version}-${classifier}.jar`;
+  } else {
+    return `${groupPath}/${artifact}/${version}/${artifact}-${version}.jar`;
+  }
+}
+
 export function generateForgeProfile(versionData, forgeVersion, prismData = null) {
   // ── Con datos de Prism Meta (camino correcto) ────────────────────────────
   if (prismData?.libraries?.length > 0) {
-    // Las libraries de Prism ya usan formato Mojang (downloads.artifact)
-    // Solo necesitamos filtrar las que no tienen artifact (raras edge cases)
-    const libraries = prismData.libraries
-      .filter(lib => lib.downloads?.artifact?.url && lib.downloads?.artifact?.path);
+    // Prism Meta sometimes omits "path" in downloads.artifact (e.g. ForgeWrapper).
+    // Derive it from the library name using Maven conventions when absent.
+    // Reusable normalizer: derives missing Maven path from name field
+    const normalizeArtifact = (entry) => {
+      const a = entry.downloads?.artifact;
+      if (!a?.url) return null;
+      if (!a.path && entry.name) {
+        const derived = nameToMavenPath(entry.name);
+        if (derived) return { ...entry, downloads: { ...entry.downloads, artifact: { ...a, path: derived } } };
+      }
+      return a.path ? entry : null;
+    };
+
+    const libraries = prismData.libraries.map(normalizeArtifact).filter(Boolean);
+
+    // mavenFiles: archivos auxiliares que ForgeWrapper necesita para ejecutar
+    // el instalador de Forge en el primer arranque. NO van al classpath, pero
+    // deben estar descargados en libraries/. Sin ellos, ForgeWrapper falla.
+    let mavenFiles = (prismData.mavenFiles ?? []).map(normalizeArtifact).filter(Boolean);
 
     // mainClass de Prism: puede ser ForgeWrapper o el mainClass real de Forge
     // ForgeWrapper (io.github.zekerzhayard.forgewrapper.installer.Main) es un wrapper
     // que Prism usa para instalar Forge on-the-fly — lo usamos igual
     const mainClass = prismData.mainClass ?? 'net.minecraftforge.fml.loading.targets.CommonClientHandler';
+
+    // Si el mainClass es ForgeWrapper, asegurar que el installer JAR está en mavenFiles
+    // para que se descargue correctamente
+    const isForgeWrapper = mainClass?.includes('forgewrapper') || mainClass?.includes('ForgeWrapper');
+    if (isForgeWrapper) {
+      const installerEntry = {
+        name: `net.minecraftforge:forge:${forgeVersion}:installer`,
+        downloads: {
+          artifact: {
+            path: `net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`,
+            url: `${API.FORGE.MAVEN_BASE}/net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`,
+            sha1: null,
+            size: 0,
+          },
+        },
+      };
+      // Evitar duplicados
+      const installerExists = mavenFiles.some(mf => mf.downloads?.artifact?.path?.includes('installer'));
+      if (!installerExists) {
+        mavenFiles = [...mavenFiles, installerEntry];
+      }
+    }
 
     // Determinar argumentos del juego
     // Prism Meta para versiones antiguas de Forge (pre-1.13) NO incluye minecraftArguments.
@@ -178,6 +242,9 @@ export function generateForgeProfile(versionData, forgeVersion, prismData = null
     }
 
     const profile = {
+      // formatVersion 2 = perfil incluye mavenFiles. Perfiles sin este campo
+      // se consideran legacy y deben regenerarse antes de lanzar.
+      formatVersion: 2,
       id: forgeVersion,
       inheritsFrom: versionData.id,
       releaseTime: prismData.releaseTime ?? versionData.releaseTime,
@@ -187,11 +254,10 @@ export function generateForgeProfile(versionData, forgeVersion, prismData = null
       minecraftArguments,
       arguments: profileArguments,
       libraries,
-      // ForgeWrapper necesita saber dónde está el installer
-      _forgeInstaller: `${API.FORGE.MAVEN_BASE}/net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`,
+      mavenFiles,
     };
 
-    console.log(`[Forge] Perfil con Prism: mainClass=${mainClass}, ${libraries.length} libraries`);
+    console.log(`[Forge] Perfil con Prism: mainClass=${mainClass}, ${libraries.length} libraries, ${mavenFiles.length} mavenFiles`);
     return profile;
   }
 
@@ -236,32 +302,33 @@ export function getForgeDownloadTasks(forgeVersion, launcherDir, forgeProfile) {
   const tasks = [];
   const librariesDir = `${launcherDir}/libraries`;
 
-  // Libraries del perfil (provienen de Prism Meta o fallback)
-  for (const lib of forgeProfile.libraries ?? []) {
-    const artifact = lib.downloads?.artifact;
-    if (!artifact?.url || !artifact?.path) continue;
+  // Builder común para libraries y mavenFiles (mismo formato Maven)
+  const pushDownloadTask = (entry, kind) => {
+    const artifact = entry.downloads?.artifact;
+    if (!artifact?.url) return;
+
+    // Derive path from name when absent (Prism Meta sometimes omits it)
+    const libPath = artifact.path ?? (entry.name ? nameToMavenPath(entry.name) : null);
+    if (!libPath) return;
 
     tasks.push({
       url:     artifact.url,
-      dest:    `${librariesDir}/${artifact.path}`,
+      dest:    `${librariesDir}/${libPath}`,
       sha1:    artifact.sha1 ?? null,
-      label:   lib.name ?? artifact.path.split('/').pop(),
-      libPath: artifact.path,  // Ruta relativa para fallbacks a Maven Central
+      label:   `${kind === 'maven' ? '[maven] ' : ''}${entry.name ?? libPath.split('/').pop()}`,
+      libPath,
     });
+  };
+
+  // Libraries del perfil (provienen de Prism Meta o fallback) — van al classpath
+  for (const lib of forgeProfile.libraries ?? []) {
+    pushDownloadTask(lib, 'lib');
   }
 
-  // Si el perfil usa ForgeWrapper, también hay que descargar el installer JAR
-  // ForgeWrapper lo necesita para completar la instalación en el primer arranque
-  const isForgeWrapper = forgeProfile.mainClass?.includes('forgewrapper') ||
-                          forgeProfile.mainClass?.includes('ForgeWrapper');
-  if (isForgeWrapper && forgeProfile._forgeInstaller) {
-    const installerPath = `net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`;
-    tasks.push({
-      url:   forgeProfile._forgeInstaller,
-      dest:  `${librariesDir}/${installerPath}`,
-      sha1:  null,
-      label: `forge-${forgeVersion}-installer.jar`,
-    });
+  // mavenFiles — auxiliares de ForgeWrapper, NO van al classpath, sí a disco
+  // El installer JAR ahora está incluido en mavenFiles si el perfil usa ForgeWrapper
+  for (const mf of forgeProfile.mavenFiles ?? []) {
+    pushDownloadTask(mf, 'maven');
   }
 
   return tasks;
@@ -312,6 +379,27 @@ export async function installForge(gameVersion, loaderVersion, launcherDir, vers
     // ── Tareas de descarga ──────────────────────────────────────────────────
     const downloadTasks = getForgeDownloadTasks(selectedVersion, launcherDir, forgeProfile);
     console.log(`[Forge] Instalación completada — ${downloadTasks.length} archivos a descargar`);
+
+    // ✓ DIAGNÓSTICO: Ver exactamente qué se va a descargar
+    console.log(`[Forge] ============ TAREAS DE DESCARGA ============`);
+    console.log(`[Forge] Total de libraries: ${forgeProfile.libraries?.length ?? 0}`);
+    console.log(`[Forge] Total de mavenFiles: ${forgeProfile.mavenFiles?.length ?? 0}`);
+
+    // Buscar el instalador en las tareas
+    const installerTask = downloadTasks.find(t => t.label.includes('installer'));
+    if (installerTask) {
+      console.log(`[Forge] ✓ Instalador SERÁ descargado:`);
+      console.log(`[Forge]   URL: ${installerTask.url}`);
+      console.log(`[Forge]   Destino: ${installerTask.dest}`);
+      console.log(`[Forge]   Etiqueta: ${installerTask.label}`);
+    } else {
+      console.warn(`[Forge] ✗ CRÍTICO: Instalador NO está en las tareas de descarga`);
+      console.warn(`[Forge] Tareas totales: ${downloadTasks.length}`);
+      downloadTasks.forEach((t, i) => {
+        console.warn(`[Forge]   [${i}] ${t.label}`);
+      });
+    }
+    console.log(`[Forge] ================================================`);
 
     return {
       loaderVersion: selectedVersion,

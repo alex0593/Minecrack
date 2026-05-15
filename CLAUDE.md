@@ -69,15 +69,97 @@ Rust backend (`download_file` command) streams downloads and verifies SHA1 durin
 
 ## Implementation Status
 
-Phases 1–2 are complete (scaffold, UI, instance model). Phase 3 (download system) is coded but not fully end-to-end tested. Phases 4–8 (loader installers, mod browser, game launch, polish) are not yet implemented.
+Phases 1–3 are complete (scaffold, UI, instance model, download system). Phase 4 improvements completed:
+- ✅ **Unified modpack browser** with modal for CurseForge + Modrinth
+- ✅ **ForgeWrapper installer detection** fixed (Maven classifier support)
+- ✅ **Automatic skin application** via CustomSkinLoader mod
+- ✅ **Version resolution robustness** (retry logic + updated fallback tables)
+
+## Phase 4 Improvements (Completed)
+
+### 1. Unified Modpack Browser & Install Modal
+**Files**: `ModpackBrowser.jsx`, `ModpackInstallModal.jsx`
+- Tabs to switch between Modrinth/CurseForge sources
+- Single modal for both platforms (downloads → extracts → imports → mods)
+- CurseForge: ZIP download → inspect → import instance → download mods
+- Modrinth: Delegates to newInstance modal with prefill (native .mrpack support pending)
+- Progress overlay with step tracking (downloading, installing-mods, done)
+
+### 2. ForgeWrapper Installer Detection Fix 🔴 CRITICAL
+**Files**: `src/lib/loaders/forge.js`, `src/lib/launcher.js`
+
+**Root cause**: Maven classifier support missing
+- Prism Meta returns installer as 4-part name: `net.minecraftforge:forge:1.19.2-43.2.14:installer`
+- Old `nameToMavenPath()` only handled 3-part names (group:artifact:version)
+- Result: Path never derived, installer never downloaded
+
+**Solution**:
+1. Updated `nameToMavenPath()` to handle 4-part Maven coordinates with classifiers
+   - `net.minecraftforge:forge:1.19.2-43.2.14:installer` → `net/minecraftforge/forge/1.19.2-43.2.14/forge-1.19.2-43.2.14-installer.jar`
+2. Add installer to `mavenFiles` array automatically when ForgeWrapper is detected
+3. Pass absolute path via `-Dforgewrapper.installer=/path/to/installer.jar` JVM property
+4. Auto-repair legacy profiles lacking formatVersion 2 via `ensureLoaderProfileUpToDate()`
+5. Manual "Reinstall Forge" button in instance settings for explicit repair
+
+**Testing**: See `FORGE_INSTALLER_FIX.md` for detailed diagnosis and verification steps
+
+### 3. Automatic Skin Application with CustomSkinLoader
+**Files**: `src/lib/skin.js`, `src/lib/launcher.js`, `ProfileModal.jsx`
+
+**Flow**:
+1. User uploads PNG skin in ProfileModal → saved as base64 in store
+2. At launch (pre-game), `applySkinToInstance()` is called:
+   - Searches Modrinth for CustomSkinLoader mod (compatible with loader+version)
+   - Downloads JAR to `instances/{id}/mods/`
+   - Copies skin PNG to `instances/{id}/CustomSkinLoader/LocalSkin/skins/{username}.png`
+   - Writes `CustomSkinLoader.json` config with loadlist
+3. CustomSkinLoader mod intercepts Minecraft's SkinManager to serve local PNG
+4. Only applies to modded instances (Fabric/Forge/Quilt/NeoForge); vanilla shows warning
+
+**Rust additions**: `write_file_base64()`, `copy_file()`, `delete_file()` commands
+
+### 4. Version Resolution Robustness
+**Files**: `src/lib/prism.js`, `src/lib/loaders/forge.js`, `neoforge.js`
+
+**Improvements**:
+- **Retry logic with backoff**: `fetchPrism()` retries 3 times on 5xx/transient errors (backoff: 1s/2s/4s)
+- **Fail-fast for 4xx**: 404/403 don't retry, fail immediately
+- **Updated KNOWN_* tables**: 
+  - `KNOWN_FORGE_VERSIONS` now includes 1.21.4-54.1.16, 1.21.3-53.1.10, etc.
+  - `KNOWN_NEOFORGE_VERSIONS` now includes 1.21.8-53, 1.20.6-139, etc.
+- Used as last fallback when Prism Meta + direct API fail
 
 ## Key External APIs
 
 | API | Auth | Used For |
 |---|---|---|
 | Mojang Version Manifest | None | Game versions, libraries, assets |
+| Prism Meta | None | Loader metadata (libraries, mavenFiles, mainClass) |
 | Fabric/Quilt Meta | None | Loader versions |
-| Forge Maven | None | Forge installer |
-| Modrinth | None (PAT optional) | Mod catalog |
-| CurseForge | API key required | Alternative mod source |
+| Forge Maven | None | Forge installer, universal JAR |
+| Modrinth | None (PAT optional) | Mod & modpack catalog, CustomSkinLoader |
+| CurseForge | API key required | Mod & modpack catalog |
 | Adoptium | None | Auto-download JRE |
+
+## Critical Implementation Details
+
+### Maven Classifier Handling
+When processing libraries from Prism Meta, library names can be:
+- **3-part**: `group:artifact:version` → `group/artifact/version/artifact-version.jar`
+- **4-part**: `group:artifact:version:classifier` → `group/artifact/version/artifact-version-classifier.jar`
+
+The `nameToMavenPath()` function in `forge.js` now handles both. Classifiers appear in forge/neoforge installers, some test JARs, and auxiliary files.
+
+### ForgeWrapper Launch Sequence
+1. Profile is loaded from `versions/{loaderVersion}/{loaderVersion}.json`
+2. If `mainClass` contains "forgewrapper", mark as ForgeWrapper instance
+3. Pass `-Dforgewrapper.installer=/absolute/path/forge-VERSION-installer.jar` to JVM
+4. ForgeWrapper main class receives this property and executes the installer
+5. Installer extracts Forge libraries to disk
+6. ForgeWrapper then loads real Forge mainClass and passes control
+
+### Skin Application Timing
+- Happens in `launcher.js` after Java detection, before game launch
+- Only logs warnings on failure; doesn't block launch (best-effort)
+- CustomSkinLoader is downloaded fresh if missing (checked against marker file)
+- Profile skin (base64) is read from store and written to PNG on disk

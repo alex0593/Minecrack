@@ -167,9 +167,25 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.modbrowser-installed-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
 }
 
 .modbrowser-card-desc {

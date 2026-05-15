@@ -1,5 +1,6 @@
 import './index.css';
 import './App.css';
+import { useEffect } from 'react';
 import { StoreProvider, useStore } from './store';
 import { useGameLauncher }         from './hooks/useGameLauncher';
 import { useInstancePersistence }  from './hooks/useInstancePersistence';
@@ -10,6 +11,8 @@ import ProfileModal      from './components/ProfileModal';
 import NewInstanceModal  from './components/NewInstanceModal';
 import DownloadOverlay   from './components/DownloadOverlay';
 import ModBrowserModal       from './components/ModBrowserModal';
+import ResourcePackBrowserModal from './components/ResourcePackBrowserModal';
+import ShaderPackBrowserModal from './components/ShaderPackBrowserModal';
 import InstanceSettingsModal from './components/InstanceSettingsModal';
 import VerifyInstanceModal   from './components/VerifyInstanceModal';
 import SetupWizard           from './components/SetupWizard';
@@ -86,6 +89,18 @@ function Modals() {
       onClose={closeModal}
     />
   );
+  if (modal === 'resourcePackBrowser') return (
+    <ResourcePackBrowserModal
+      instanceId={modalData?.instanceId}
+      onClose={closeModal}
+    />
+  );
+  if (modal === 'shaderPackBrowser') return (
+    <ShaderPackBrowserModal
+      instanceId={modalData?.instanceId}
+      onClose={closeModal}
+    />
+  );
   if (modal === 'download')    return (
     <DownloadOverlay
       versionId={modalData?.versionId}
@@ -158,10 +173,40 @@ function JavaDownloadOverlay() {
   );
 }
 
+// Aplica tema y accent color al document siempre que cambie la config
+function useThemeSync() {
+  const { state } = useStore();
+  const { theme, accentColor } = state.config;
+
+  useEffect(() => {
+    // Aplicar tema
+    const resolvedTheme = theme === 'system'
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : (theme ?? 'dark');
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (accentColor && /^#[0-9A-F]{6}$/i.test(accentColor)) {
+      const r = parseInt(accentColor.slice(1, 3), 16);
+      const g = parseInt(accentColor.slice(3, 5), 16);
+      const b = parseInt(accentColor.slice(5, 7), 16);
+      document.documentElement.style.setProperty('--accent', accentColor);
+      document.documentElement.style.setProperty('--accent-dim', accentColor);
+      document.documentElement.style.setProperty('--text-accent', accentColor);
+      document.documentElement.style.setProperty('--accent-glow', `rgba(${r},${g},${b},0.15)`);
+      document.documentElement.style.setProperty('--accent-glow-strong', `rgba(${r},${g},${b},0.35)`);
+      document.documentElement.style.setProperty('--border-accent', `rgba(${r},${g},${b},0.3)`);
+      document.documentElement.style.setProperty('--shadow-accent', `0 0 20px rgba(${r},${g},${b},0.2)`);
+    }
+  }, [accentColor]);
+}
+
 function AppShell() {
   const { state } = useStore();
   useGameLauncher();
   useInstancePersistence();
+  useThemeSync();
 
   if (state.showSetupWizard) {
     return <SetupWizard />;

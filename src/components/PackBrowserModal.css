@@ -1,0 +1,302 @@
+/* PackBrowserModal.css — Estilos para Resource Pack y Shader Pack browsers */
+
+.packbrowser-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+}
+
+.packbrowser-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 1200px;
+  height: 90vh;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Header */
+.packbrowser-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--gap-lg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.packbrowser-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+/* Filtros */
+.packbrowser-filters {
+  display: flex;
+  gap: var(--gap-sm);
+  padding: var(--gap-lg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.packbrowser-search {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+.packbrowser-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 230, 118, 0.1);
+}
+
+/* Body */
+.packbrowser-body {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: var(--gap-lg);
+  flex: 1;
+  overflow: hidden;
+  padding: var(--gap-lg);
+}
+
+.packbrowser-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  overflow-y: auto;
+  padding-right: var(--gap-sm);
+}
+
+.packbrowser-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.packbrowser-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.packbrowser-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.packbrowser-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.packbrowser-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 8px;
+  margin-bottom: 8px;
+}
+
+.packbrowser-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Card */
+.packbrowser-card {
+  display: flex;
+  gap: var(--gap-sm);
+  padding: var(--gap-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: left;
+  font-family: var(--font-sans);
+}
+
+.packbrowser-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.packbrowser-card.selected {
+  border-color: var(--accent);
+  background: rgba(0, 230, 118, 0.05);
+}
+
+.packbrowser-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.packbrowser-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.packbrowser-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.packbrowser-card-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.packbrowser-card-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* Detail Panel */
+.packbrowser-detail-panel {
+  border-left: 1px solid var(--border);
+  padding-left: var(--gap-lg);
+  overflow-y: auto;
+  padding-right: var(--gap-sm);
+}
+
+.packbrowser-detail-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.packbrowser-detail-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.packbrowser-detail-panel::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.packbrowser-detail-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.packbrowser-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  text-align: center;
+  gap: 12px;
+}
+
+.packbrowser-detail-empty div {
+  font-size: 48px;
+}
+
+.packbrowser-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+}
+
+.packbrowser-detail-header {
+  display: flex;
+  gap: var(--gap-md);
+  align-items: flex-start;
+}
+
+.packbrowser-detail-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.packbrowser-detail-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.packbrowser-detail-by {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.packbrowser-detail-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.packbrowser-detail-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Progress */
+.packbrowser-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.packbrowser-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-base);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.packbrowser-progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+.packbrowser-progress-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

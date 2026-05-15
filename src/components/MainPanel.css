@@ -148,6 +148,58 @@
   padding: var(--gap-lg) var(--gap-xl);
 }
 
+/* Mods sub-tabs */
+.mods-subtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.mods-subtab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 4px 4px 0 0;
+}
+
+.mods-subtab:hover { color: var(--text-primary); }
+
+.mods-subtab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Descripción expandida de un mod */
+.mod-description-panel {
+  padding: 8px 12px;
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+  line-height: 1.5;
+}
+
+.mod-description-empty { color: var(--text-muted); font-style: italic; }
+
+.mod-expanded-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 /* Mods tab */
 .mods-header {
   display: flex;

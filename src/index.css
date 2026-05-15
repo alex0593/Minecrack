@@ -787,3 +787,86 @@ p  { color: var(--text-secondary); }
   color: var(--text-secondary);
   font-weight: 500;
 }
+
+/* ─── Light theme contrast fixes ───────────────────────────────────────── */
+[data-theme="light"] .btn-ghost:hover {
+  border-color: rgba(0,0,0,0.15);
+}
+[data-theme="light"] .btn-ghost {
+  border-color: rgba(0,0,0,0.12);
+  color: var(--text-secondary);
+}
+[data-theme="light"] .badge-gray {
+  background: rgba(0,0,0,0.06);
+  color: var(--text-muted);
+}
+[data-theme="light"] .instance-card:hover {
+  border-color: rgba(0,0,0,0.15);
+}
+[data-theme="light"] .instance-card.is-selected {
+  border-color: var(--border-accent);
+}
+[data-theme="light"] .instance-card-icon {
+  background: rgba(0,0,0,0.05);
+}
+[data-theme="light"] .instance-card-badge {
+  background: rgba(0,0,0,0.06);
+  color: var(--text-secondary);
+}
+/* Botón primario con accent brillante: texto siempre negro */
+[data-theme="light"] .btn-primary,
+[data-theme="light"] .btn-primary:hover {
+  color: #000;
+}
+/* Modales en light: fondo blanco con sombra legible */
+[data-theme="light"] .modal-content,
+[data-theme="light"] .dl-modal {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+/* Status pills en light */
+[data-theme="light"] .status-pill-ready {
+  background: rgba(0, 200, 83, 0.12);
+  color: #007030;
+}
+[data-theme="light"] .status-pill-ready .dot {
+  background: #007030;
+}
+[data-theme="light"] .status-pill-pending {
+  background: rgba(230,120,0,0.12);
+  color: #a05000;
+}
+[data-theme="light"] .status-pill-pending .dot {
+  background: #a05000;
+}
+/* Nav items en light */
+[data-theme="light"] .sidebar-nav-item {
+  color: var(--text-secondary);
+}
+[data-theme="light"] .sidebar-nav-item.active {
+  color: var(--accent);
+}
+[data-theme="light"] .sidebar-nav-item:hover {
+  color: var(--text-primary);
+  background: rgba(0,0,0,0.05);
+}
+/* Profile card en light */
+[data-theme="light"] .profile-card:hover {
+  background: rgba(0,0,0,0.05);
+}
+/* Console search en light */
+[data-theme="light"] .console-search {
+  background: #f5f5f5;
+}
+/* Accordion / settings sections en light */
+[data-theme="light"] .settings-section {
+  border-color: rgba(0,0,0,0.08);
+}
+/* Scrollbar en light */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.18);
+}
+/* Badge installed en light */
+[data-theme="light"] .badge-installed {
+  background: rgba(0,200,83,0.15);
+  color: #007030;
+}

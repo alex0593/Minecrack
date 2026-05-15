@@ -209,13 +209,12 @@ export function buildClasspath(versionData, launcherDir, versionId) {
 
     let libPath = null;
 
-    // Formato antiguo: downloads.artifact.path
     const artifact = lib.downloads?.artifact;
     if (artifact?.path) {
       libPath = artifact.path;
-    }
-    // Formato nuevo: solo url + name (convertir a path)
-    else if (lib.name && !artifact) {
+    } else if (lib.name) {
+      // Handles: artifact with url but no path (e.g. Prism ForgeWrapper),
+      // or no artifact object at all — derive path from Maven name convention.
       libPath = nameToPath(lib.name);
     }
 

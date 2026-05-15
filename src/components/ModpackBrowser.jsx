@@ -1,44 +1,55 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useStore } from '../store';
-import { searchModpacks, getModpackVersions, getProject } from '../lib/api/modrinth';
+import { searchModpacks as searchModrinthPacks } from '../lib/api/modrinth';
+import { searchModpacks as searchCurseforgePacks, isCurseForgeConfigured } from '../lib/api/curseforge-modpacks';
 import { POPULAR_VERSIONS } from '../lib/instances';
 import Select from './ui/Select';
+import ModpackInstallModal from './ModpackInstallModal';
 import './ModpackBrowser.css';
 
 const LOADERS_MODPACK = ['fabric', 'forge', 'quilt', 'neoforge'];
 const LIMIT = 20;
 
-// ─── Modpack card in list ─────────────────────────────────────────────────────
-function ModpackCard({ pack, selected, onClick }) {
-  const loaderTags = (pack.categories ?? []).filter(c =>
-    LOADERS_MODPACK.includes(c.toLowerCase())
-  );
+// ─── Modpack card unificada (Modrinth o CurseForge) ──────────────────────────
+function ModpackCard({ source, pack, onClick }) {
+  const display = source === 'curseforge'
+    ? {
+        title:    pack.name,
+        author:   pack.authors?.[0]?.name ?? '',
+        desc:     pack.summary,
+        icon:     pack.logo?.url,
+        downloads: pack.downloadCount,
+        loaders:  inferLoadersFromCurseforge(pack),
+      }
+    : {
+        title:    pack.title,
+        author:   pack.author,
+        desc:     pack.description,
+        icon:     pack.icon_url,
+        downloads: pack.downloads,
+        loaders:  (pack.categories ?? []).filter(c => LOADERS_MODPACK.includes(c.toLowerCase())),
+      };
 
   return (
-    <button
-      className={`mpbrowser-card${selected ? ' selected' : ''}`}
-      onClick={onClick}
-    >
-      <img
-        className="mpbrowser-card-icon"
-        src={pack.icon_url || '/default-mod.png'}
-        alt={pack.title}
-        onError={e => { e.target.style.display = 'none'; }}
-      />
+    <button className="mpbrowser-card" onClick={onClick}>
+      {display.icon && (
+        <img
+          className="mpbrowser-card-icon"
+          src={display.icon}
+          alt={display.title}
+          onError={e => { e.target.style.display = 'none'; }}
+        />
+      )}
       <div className="mpbrowser-card-body">
-        <div className="mpbrowser-card-title">{pack.title}</div>
-        <div className="mpbrowser-card-author">por {pack.author}</div>
-        <div className="mpbrowser-card-desc">{pack.description}</div>
+        <div className="mpbrowser-card-title">{display.title}</div>
+        <div className="mpbrowser-card-author">por {display.author || '—'}</div>
+        <div className="mpbrowser-card-desc">{display.desc}</div>
         <div className="mpbrowser-card-meta">
-          <span>⬇ {(pack.downloads / 1000).toFixed(0)}k</span>
-          <span>🔄 {new Date(pack.date_modified).toLocaleDateString()}</span>
+          <span>⬇ {(display.downloads ?? 0).toLocaleString()}</span>
         </div>
-        {loaderTags.length > 0 && (
+        {display.loaders?.length > 0 && (
           <div className="mpbrowser-card-tags">
-            {loaderTags.map(tag => (
-              <span key={tag} className={`mpbrowser-tag mpbrowser-tag-${tag}`}>
-                {tag}
-              </span>
+            {display.loaders.map(tag => (
+              <span key={tag} className={`mpbrowser-tag mpbrowser-tag-${tag.toLowerCase()}`}>{tag}</span>
             ))}
           </div>
         )}
@@ -47,206 +58,99 @@ function ModpackCard({ pack, selected, onClick }) {
   );
 }
 
-// ─── Modpack detail panel ─────────────────────────────────────────────────────
-function ModpackDetail({ pack }) {
-  const { openModal } = useStore();
-  const [versions,    setVersions]    = useState([]);
-  const [selectedVer, setSelectedVer] = useState(null);
-  const [project,     setProject]     = useState(null);
-
-  useEffect(() => {
-    if (!pack) return;
-    setVersions([]);
-    setSelectedVer(null);
-    setProject(null);
-
-    // Load versions and project details in parallel
-    Promise.all([
-      getModpackVersions(pack.project_id).catch(() => []),
-      getProject(pack.project_id).catch(() => null),
-    ]).then(([vers, proj]) => {
-      setVersions(vers);
-      if (vers.length > 0) setSelectedVer(vers[0]);
-      setProject(proj);
-    });
-  }, [pack?.project_id]);
-
-  if (!pack) {
-    return (
-      <div className="mpbrowser-detail-empty">
-        <div style={{ fontSize: 48 }}>📦</div>
-        <p>Selecciona un modpack para ver los detalles</p>
-      </div>
-    );
-  }
-
-  // Derive mc version + loader from selected version
-  const mcVersion  = selectedVer?.game_versions?.[0] ?? null;
-  const loaderName = selectedVer?.loaders?.find(l => LOADERS_MODPACK.includes(l)) ?? null;
-
-  const loaderTags = (pack.categories ?? []).filter(c =>
-    LOADERS_MODPACK.includes(c.toLowerCase())
-  );
-  const allTags = (pack.categories ?? []).filter(c =>
-    !LOADERS_MODPACK.includes(c.toLowerCase())
-  );
-
-  const handleInstall = () => {
-    openModal('newInstance', {
-      prefill: {
-        name:    pack.title,
-        version: mcVersion,
-        loader:  loaderName ?? 'fabric',
-      },
-    });
-  };
-
-  return (
-    <div>
-      {/* Header */}
-      <div className="mpbrowser-detail-header">
-        {pack.icon_url && (
-          <img
-            src={pack.icon_url}
-            alt={pack.title}
-            className="mpbrowser-detail-icon"
-          />
-        )}
-        <div>
-          <h2>{pack.title}</h2>
-          <div className="mpbrowser-detail-by">por {pack.author}</div>
-          <div className="mpbrowser-detail-stats">
-            <span>⬇ {pack.downloads?.toLocaleString()} descargas</span>
-            <span>👥 {pack.follows?.toLocaleString()} seguidores</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Description */}
-      <p className="mpbrowser-detail-desc">{pack.description}</p>
-
-      {/* Tags */}
-      {(loaderTags.length > 0 || allTags.length > 0) && (
-        <div className="mpbrowser-detail-tags">
-          {loaderTags.map(t => (
-            <span key={t} className={`mpbrowser-tag mpbrowser-tag-${t}`}>{t}</span>
-          ))}
-          {allTags.slice(0, 8).map(t => (
-            <span key={t} className="mpbrowser-tag">{t}</span>
-          ))}
-        </div>
-      )}
-
-      {/* Version selector */}
-      <div className="mpbrowser-detail-section">
-        <label>Versión del modpack</label>
-        {versions.length === 0 ? (
-          <div className="mpbrowser-no-versions">
-            Cargando versiones…
-          </div>
-        ) : (
-          <Select
-            size="sm"
-            value={selectedVer?.id ?? ''}
-            onChange={(id) => setSelectedVer(versions.find(v => v.id === id))}
-            options={versions.map(v => ({
-              value: v.id,
-              label: `${v.name} (${v.game_versions?.[0] ?? '?'} · ${v.loaders?.join('/') ?? '?'})`,
-            }))}
-          />
-        )}
-      </div>
-
-      {/* Version info */}
-      {selectedVer && (
-        <div className="mpbrowser-version-info">
-          {mcVersion  && <span>🎮 MC {mcVersion}</span>}
-          {loaderName && <span>🔧 {loaderName.charAt(0).toUpperCase() + loaderName.slice(1)}</span>}
-          {selectedVer.files?.[0]?.size && (
-            <span>📦 {(selectedVer.files[0].size / 1_048_576).toFixed(1)} MB</span>
-          )}
-        </div>
-      )}
-
-      {/* Install button */}
-      <button
-        className="btn btn-primary mpbrowser-install-btn"
-        disabled={versions.length === 0 || !selectedVer}
-        onClick={handleInstall}
-      >
-        ⬇ Crear instancia desde este modpack
-      </button>
-      <p className="mpbrowser-install-note">
-        Se creará una instancia con MC {mcVersion ?? '?'} + {loaderName ?? 'loader'} preconfigurado.
-        Luego podrás importar el .mrpack desde los ajustes de la instancia.
-      </p>
-    </div>
-  );
+function inferLoadersFromCurseforge(pack) {
+  // CurseForge: las categorías incluyen IDs de loaders, no nombres. Lo más confiable
+  // es inferir del último file featured si está disponible.
+  const featured = pack.latestFiles?.[0]?.gameVersions ?? [];
+  return featured.filter(v => LOADERS_MODPACK.includes(v.toLowerCase()));
 }
 
-// ─── Main browser ─────────────────────────────────────────────────────────────
+// ─── Main browser ────────────────────────────────────────────────────────────
 export default function ModpackBrowser() {
+  const [source,        setSource]        = useState('modrinth');  // 'modrinth' | 'curseforge'
   const [query,         setQuery]         = useState('');
   const [results,       setResults]       = useState([]);
   const [total,         setTotal]         = useState(0);
   const [offset,        setOffset]        = useState(0);
   const [loading,       setLoading]       = useState(false);
-  const [selected,      setSelected]      = useState(null);
   const [filterVersion, setFilterVersion] = useState('');
   const [filterLoader,  setFilterLoader]  = useState('');
+  const [installPack,   setInstallPack]   = useState(null);
 
   const debounceRef = useRef(null);
 
-  const doSearch = useCallback(async (q, version, loader, off = 0) => {
+  const doSearch = useCallback(async (src, q, version, loader, off = 0) => {
     setLoading(true);
     try {
-      const data = await searchModpacks({
-        query: q,
-        gameVersion: version || undefined,
-        loader: loader || undefined,
-        limit: LIMIT,
-        offset: off,
-      });
-      if (off === 0) setResults(data.hits);
-      else setResults(prev => [...prev, ...data.hits]);
-      setTotal(data.total_hits);
+      let data;
+      if (src === 'modrinth') {
+        data = await searchModrinthPacks({
+          query: q,
+          gameVersion: version || undefined,
+          loader: loader || undefined,
+          limit: LIMIT,
+          offset: off,
+        });
+        if (off === 0) setResults(data.hits);
+        else setResults(prev => [...prev, ...data.hits]);
+        setTotal(data.total_hits);
+      } else {
+        // CurseForge
+        const r = await searchCurseforgePacks(q || ' ', {
+          gameVersion: version || undefined,
+          limit: LIMIT,
+        });
+        if (off === 0) setResults(r.data || []);
+        else setResults(prev => [...prev, ...(r.data || [])]);
+        setTotal(r.pagination?.totalCount ?? (r.data?.length ?? 0));
+      }
       setOffset(off);
     } catch (err) {
       console.error('[ModpackBrowser] Error buscando:', err);
+      setResults([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Initial search
-  useEffect(() => { doSearch('', '', '', 0); }, []);
-
-  // Debounce on query/filter change
+  // Search inicial al cambiar de fuente o filtros
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      doSearch(query, filterVersion, filterLoader, 0);
+      doSearch(source, query, filterVersion, filterLoader, 0);
     }, 400);
     return () => clearTimeout(debounceRef.current);
-  }, [query, filterVersion, filterLoader]);
+  }, [source, query, filterVersion, filterLoader, doSearch]);
 
-  const loadMore = () => doSearch(query, filterVersion, filterLoader, offset + LIMIT);
+  const loadMore = () => doSearch(source, query, filterVersion, filterLoader, offset + LIMIT);
 
   return (
     <div className="mpbrowser">
-      {/* Header */}
+      {/* Header con tabs de fuente */}
       <div className="mpbrowser-header">
-        <h1 className="mpbrowser-title">📦 Modpacks — Modrinth</h1>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          Descubre y juega modpacks completos
-        </span>
+        <h1 className="mpbrowser-title">📦 Modpacks</h1>
+        <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+          <button
+            className={`btn btn-sm ${source === 'modrinth' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setSource('modrinth')}
+          >
+            Modrinth
+          </button>
+          <button
+            className={`btn btn-sm ${source === 'curseforge' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setSource('curseforge')}
+            title={!isCurseForgeConfigured() ? 'Requiere API key en .env' : ''}
+          >
+            CurseForge {!isCurseForgeConfigured() && '⚠️'}
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
       <div className="mpbrowser-filters">
         <input
           className="mpbrowser-search"
-          placeholder="Buscar modpacks…"
+          placeholder={`Buscar modpacks en ${source === 'modrinth' ? 'Modrinth' : 'CurseForge'}…`}
           value={query}
           onChange={e => setQuery(e.target.value)}
           autoFocus
@@ -261,46 +165,51 @@ export default function ModpackBrowser() {
         <datalist id="mp-versions-list">
           {POPULAR_VERSIONS.map(v => <option key={v} value={v} />)}
         </datalist>
-        <Select
-          size="sm"
-          value={filterLoader}
-          onChange={setFilterLoader}
-          placeholder="Todos los loaders"
-          options={[
-            { value: '', label: 'Todos los loaders' },
-            ...LOADERS_MODPACK.map(l => ({
-              value: l,
-              label: l.charAt(0).toUpperCase() + l.slice(1),
-            })),
-          ]}
-        />
+        {source === 'modrinth' && (
+          <Select
+            size="sm"
+            value={filterLoader}
+            onChange={setFilterLoader}
+            placeholder="Todos los loaders"
+            options={[
+              { value: '', label: 'Todos los loaders' },
+              ...LOADERS_MODPACK.map(l => ({
+                value: l,
+                label: l.charAt(0).toUpperCase() + l.slice(1),
+              })),
+            ]}
+          />
+        )}
       </div>
 
-      {/* Body */}
-      <div className="mpbrowser-body">
-        {/* List */}
-        <div className="mpbrowser-list">
+      {/* Grid (sin panel detalle) */}
+      <div className="mpbrowser-body" style={{ display: 'block' }}>
+        <div className="mpbrowser-list" style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: 12,
+        }}>
           {loading && results.length === 0 ? (
             <div className="mpbrowser-loading">Buscando modpacks…</div>
           ) : results.length === 0 ? (
             <div className="mpbrowser-loading">No se encontraron modpacks</div>
           ) : (
             <>
-              <div className="mpbrowser-count">
+              <div className="mpbrowser-count" style={{ gridColumn: '1 / -1' }}>
                 {total.toLocaleString()} modpacks
               </div>
               {results.map(pack => (
                 <ModpackCard
-                  key={pack.project_id}
+                  key={source === 'curseforge' ? pack.id : pack.project_id}
+                  source={source}
                   pack={pack}
-                  selected={selected?.project_id === pack.project_id}
-                  onClick={() => setSelected(pack)}
+                  onClick={() => setInstallPack(pack)}
                 />
               ))}
               {results.length < total && (
                 <button
                   className="btn btn-ghost btn-sm"
-                  style={{ width: '100%', marginTop: 8 }}
+                  style={{ gridColumn: '1 / -1' }}
                   onClick={loadMore}
                   disabled={loading}
                 >
@@ -310,12 +219,16 @@ export default function ModpackBrowser() {
             </>
           )}
         </div>
-
-        {/* Detail */}
-        <div className="mpbrowser-detail-panel">
-          <ModpackDetail pack={selected} />
-        </div>
       </div>
+
+      {/* Modal de instalación */}
+      {installPack && (
+        <ModpackInstallModal
+          source={source}
+          pack={installPack}
+          onClose={() => setInstallPack(null)}
+        />
+      )}
     </div>
   );
 }

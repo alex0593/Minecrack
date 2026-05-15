@@ -169,8 +169,14 @@ const StoreContext = createContext(null);
 export function StoreProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const openModal = useCallback((name, data) =>
-    dispatch({ type: 'OPEN_MODAL', payload: { name, data } }), []);
+  const openModal = useCallback((name, data) => {
+    // Auto-close any existing modal before opening a new one
+    if (state.modal) {
+      dispatch({ type: 'CLOSE_MODAL' });
+    }
+    dispatch({ type: 'OPEN_MODAL', payload: { name, data } });
+  }, [state.modal]);
+
   const closeModal = useCallback(() =>
     dispatch({ type: 'CLOSE_MODAL' }), []);
 

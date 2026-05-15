@@ -39,6 +39,9 @@ export function useGameLauncher() {
         const safeProfile = {
           username,
           uuid: profile.uuid || generateOfflineUUID(username),
+          // Skin info para CustomSkinLoader
+          skin: profile.skinBase64 || profile.skin || null,
+          skinSource: profile.skinSource || 'none',
         };
 
         // Escuchar progreso de descarga de Java
@@ -65,6 +68,17 @@ export function useGameLauncher() {
               }});
             } else if (info.phase === 'done') {
               dispatch({ type: 'CLEAR_JAVA_DOWNLOAD' });
+            }
+          },
+          onRepairProgress: (info) => {
+            if (info.phase === 'done') {
+              dispatch({ type: 'CLEAR_JAVA_DOWNLOAD' });
+            } else {
+              dispatch({ type: 'SET_JAVA_DOWNLOAD', payload: {
+                phase: 'Reparando instalación',
+                percent: info.percent ?? 0,
+                label: info.label || 'Reparando perfil del loader…',
+              }});
             }
           },
         });

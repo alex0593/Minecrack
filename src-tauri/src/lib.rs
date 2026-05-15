@@ -6,6 +6,7 @@ use futures_util::StreamExt;
 use tauri::Emitter;
 use flate2::read::GzDecoder;
 use tar::Archive as TarArchive;
+use chrono::Utc;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Estructuras compartidas JS ↔ Rust
@@ -67,6 +68,43 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
 #[tauri::command]
 async fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMANDO: Borra un archivo (no-op si no existe)
+// ─────────────────────────────────────────────────────────────────────────────
+#[tauri::command]
+async fn delete_file(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() { return Ok(()); }
+    std::fs::remove_file(&p).map_err(|e| e.to_string())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMANDO: Escribe un archivo binario desde base64 (skins, imágenes, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+#[tauri::command]
+async fn write_file_base64(path: String, content_base64: String) -> Result<(), String> {
+    use base64::{Engine as _, engine::general_purpose};
+    let bytes = general_purpose::STANDARD.decode(&content_base64)
+        .map_err(|e| format!("Base64 inválido: {}", e))?;
+    let p = PathBuf::from(&path);
+    if let Some(parent) = p.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&p, &bytes).map_err(|e| e.to_string())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMANDO: Copia un archivo (preservando contenido binario)
+// ─────────────────────────────────────────────────────────────────────────────
+#[tauri::command]
+async fn copy_file(src: String, dest: String) -> Result<(), String> {
+    let dest_path = PathBuf::from(&dest);
+    if let Some(parent) = dest_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::copy(&src, &dest_path).map(|_| ()).map_err(|e| e.to_string())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -248,11 +286,142 @@ async fn launch_game(
 ) -> Result<(), String> {
     use std::process::Stdio;
 
-    let mut args: Vec<String> = config.jvm_args;
+    // ✓ PASO CRÍTICO: Convertir rutas de forward slashes a backslashes para Windows
+    // JavaScript envía rutas con forward slashes (C:/path/to/file.jar)
+    // Pero Java en Windows necesita backslashes para acceder a archivos físicos
+    let jvm_args_fixed: Vec<String> = config.jvm_args.iter()
+        .map(|arg| {
+            // Si el argumento contiene una ruta con forward slashes, convertir a backslashes
+            if arg.contains("-D") && arg.contains(":/") {
+                // Este es un argumento del sistema (-Dkey=value) con ruta absoluta en Windows
+                arg.replace('/', "\\")
+            } else {
+                arg.clone()
+            }
+        })
+        .collect();
+
+    // ✓ LOG DIAGNÓSTICO: Imprimir el comando completo antes de construir args
+    eprintln!("[Rust] ============ COMANDO DE LANZAMIENTO ============");
+    eprintln!("[Rust] Java: {}", config.java_path);
+    eprintln!("[Rust] Main Class: {}", config.main_class);
+    eprintln!("[Rust] Game Dir: {}", config.game_dir);
+    eprintln!("[Rust] JVM Args ({} total):", jvm_args_fixed.len());
+    for (i, arg) in jvm_args_fixed.iter().enumerate() {
+        eprintln!("[Rust]   [{}] {}", i, arg);
+    }
+    eprintln!("[Rust] Classpath entries: {}", config.classpath.matches(';').count() + 1);
+    if config.classpath.len() > 500 {
+        eprintln!("[Rust]   [classpath truncado - {} chars total]", config.classpath.len());
+        // Mostrar primeras y últimas partes del classpath
+        let parts: Vec<&str> = config.classpath.split(';').collect();
+        if parts.len() > 0 {
+            eprintln!("[Rust]   FIRST: {}", parts[0]);
+            eprintln!("[Rust]   LAST: {}", parts[parts.len()-1]);
+        }
+    } else {
+        eprintln!("[Rust]   {}", config.classpath);
+    }
+    eprintln!("[Rust] ===================================================");
+
+    // ✓ DIAGNÓSTICO 1: Verificar si el instalador de Forge existe físicamente
+    eprintln!("[Rust] ============ DIAGNÓSTICO DE ARCHIVOS ============");
+    for (i, arg) in jvm_args_fixed.iter().enumerate() {
+        if arg.contains("forgewrapper.installer") {
+            // Extraer la ruta del argumento
+            if let Some(path_start) = arg.find('=') {
+                let installer_path = &arg[path_start + 1..];
+                let path = std::path::Path::new(installer_path);
+                let exists = path.exists();
+                let metadata = std::fs::metadata(installer_path);
+
+                eprintln!("[Rust] Argumento [{}]: -Dforgewrapper.installer", i);
+                eprintln!("[Rust] Ruta: {}", installer_path);
+                eprintln!("[Rust] ¿Existe?: {}", if exists { "✓ SÍ" } else { "✗ NO" });
+
+                if let Ok(meta) = metadata {
+                    eprintln!("[Rust] Tamaño: {} bytes (~{} MB)", meta.len(), meta.len() / (1024 * 1024));
+                    eprintln!("[Rust] Es archivo?: {}", if meta.is_file() { "✓ SÍ" } else { "✗ NO" });
+                } else {
+                    eprintln!("[Rust] No se pudo leer metadata del archivo");
+                }
+
+                if !exists {
+                    eprintln!("[Rust] ⚠️ CRÍTICO: El instalador NO existe. Problema en la fase de descarga.");
+                }
+            }
+        }
+    }
+
+    // ✓ DIAGNÓSTICO 2: Verificar que no hay comillas literales en los argumentos
+    eprintln!("[Rust] Verificando argumentos por comillas incrustadas...");
+    let mut has_quote_issues = false;
+    for (i, arg) in jvm_args_fixed.iter().enumerate() {
+        if arg.contains("\"") {
+            eprintln!("[Rust] ⚠️ [{}] Contiene comillas literales: {}", i, arg);
+            has_quote_issues = true;
+        }
+    }
+    if !has_quote_issues {
+        eprintln!("[Rust] ✓ Ningún argumento contiene comillas incrustadas");
+    }
+
+    // ✓ DIAGNÓSTICO 3: Verificar game_args
+    eprintln!("[Rust] Game Args ({} total):", config.game_args.len());
+    if config.game_args.is_empty() {
+        eprintln!("[Rust] ⚠️ No hay game_args. ForgeWrapper podría no saber qué versión/gameDir usar.");
+    } else {
+        for (i, arg) in config.game_args.iter().enumerate() {
+            eprintln!("[Rust]   [game_args {}] {}", i, arg);
+        }
+    }
+    eprintln!("[Rust] ===================================================");
+
+    // ✓ VALIDACIÓN PREVIA: Asegurar que java_path existe y es válido
+    eprintln!("[Rust] Validando ruta de Java: {}", config.java_path);
+
+    if config.java_path.is_empty() {
+        return Err("FATAL: java_path está vacío. El frontend no detectó Java.".to_string());
+    }
+
+    let java_path = std::path::Path::new(&config.java_path);
+    if !java_path.exists() {
+        return Err(format!(
+            "FATAL: Java no encontrado en:\n  {}\n\n\
+            Solución: Instala JDK 17+ o reinicia tu PC (variable PATH puede estar desactualizada).",
+            config.java_path
+        ));
+    }
+
+    if !java_path.is_file() {
+        return Err(format!("FATAL: La ruta de Java no es un archivo: {}", config.java_path));
+    }
+
+    eprintln!("[Rust] ✓ Java validado: {}", config.java_path);
+
+    // ✓ VALIDACIÓN PREVIA: Asegurar que game_dir es válido
+    if !std::path::Path::new(&config.game_dir).exists() {
+        eprintln!("[Rust] ⚠️ Game dir no existe, creando: {}", config.game_dir);
+        std::fs::create_dir_all(&config.game_dir)
+            .map_err(|e| format!("No se pudo crear game_dir: {}", e))?;
+    }
+
+    // ✓ VALIDACIÓN PREVIA: Validar tamaño de argumentos
+    let total_arg_size: usize = config.jvm_args.iter().map(|s| s.len()).sum::<usize>()
+        + config.game_args.iter().map(|s| s.len()).sum::<usize>()
+        + config.classpath.len();
+    eprintln!("[Rust] Total de caracteres en argumentos: {} bytes", total_arg_size);
+    if total_arg_size > 32000 {
+        eprintln!("[Rust] ⚠️ ADVERTENCIA: Línea de comandos muy larga ({} bytes). Podría causar problemas.", total_arg_size);
+    }
+
+    let mut args = jvm_args_fixed;
     args.push("-cp".to_string());
-    args.push(config.classpath);
-    args.push(config.main_class);
-    args.extend(config.game_args);
+    args.push(config.classpath.clone());
+    args.push(config.main_class.clone());
+    args.extend(config.game_args.clone());
+
+    eprintln!("[Rust] ✓ Intentando lanzar Java con {} argumentos...", args.len());
 
     let mut child = tokio::process::Command::new(&config.java_path)
         .args(&args)
@@ -260,7 +429,12 @@ async fn launch_game(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("No se pudo lanzar Java: {}", e))?;
+        .map_err(|e| {
+            eprintln!("[Rust] ✗ FATAL: No se pudo lanzar Java. Error: {}", e);
+            format!("No se pudo lanzar Java: {}", e)
+        })?;
+
+    eprintln!("[Rust] ✓ Java lanzado exitosamente, esperando salida...");
 
     let _ = window.emit("game://started", ());
 
@@ -306,10 +480,11 @@ async fn launch_game(
 // ─────────────────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModInfo {
-    pub filename: String,       // ej: "sodium-0.5.3.jar"
-    pub name:     String,       // ej: "Sodium"
-    pub version:  String,       // ej: "0.5.3"
-    pub enabled:  bool,         // true si es .jar, false si es .jar.disabled
+    pub filename:    String,         // ej: "sodium-0.5.3.jar"
+    pub name:        String,         // ej: "Sodium"
+    pub version:     String,         // ej: "0.5.3"
+    pub enabled:     bool,           // true si es .jar, false si es .jar.disabled
+    pub description: Option<String>, // descripción del mod leída del JAR
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -374,10 +549,10 @@ async fn list_mods(launcher_dir: String, instance_id: String) -> Result<Vec<ModI
             }
 
             let enabled = filename_str.ends_with(".jar");
-            let (name, version) = extract_mod_metadata(&path).unwrap_or_else(|| {
+            let (name, version, description) = extract_mod_metadata(&path).unwrap_or_else(|| {
                 // Si no se puede extraer metadata, usar nombre del archivo
                 let clean_name = filename_str.replace(".jar.disabled", "").replace(".jar", "");
-                (clean_name.clone(), "unknown".to_string())
+                (clean_name.clone(), "unknown".to_string(), None)
             });
 
             mods.push(ModInfo {
@@ -385,6 +560,7 @@ async fn list_mods(launcher_dir: String, instance_id: String) -> Result<Vec<ModI
                 name,
                 version,
                 enabled,
+                description,
             });
         }
     }
@@ -394,8 +570,18 @@ async fn list_mods(launcher_dir: String, instance_id: String) -> Result<Vec<ModI
     Ok(mods)
 }
 
-// Helper: extrae metadata de un JAR (nombre y versión del mod)
-fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String)> {
+/// Devuelve None si la cadena contiene un placeholder de Gradle/Maven sin resolver.
+fn sanitize_version(v: &str) -> String {
+    let v = v.trim();
+    if v.is_empty() || v.starts_with("${") || v.contains("${") {
+        "N/A".to_string()
+    } else {
+        v.to_string()
+    }
+}
+
+// Helper: extrae metadata de un JAR (nombre, versión y descripción)
+fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<String>)> {
     let file = std::fs::File::open(jar_path).ok()?;
     let mut archive = zip::ZipArchive::new(file).ok()?;
 
@@ -404,45 +590,33 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String)> {
         let mut content = String::new();
         if fabric_file.read_to_string(&mut content).is_ok() {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                let name = json["name"]
-                    .as_str()
-                    .unwrap_or("Unknown")
-                    .to_string();
-                let version = json["version"]
-                    .as_str()
-                    .unwrap_or("unknown")
-                    .to_string();
-                return Some((name, version));
+                let name = json["name"].as_str().unwrap_or("Unknown").to_string();
+                let version = sanitize_version(json["version"].as_str().unwrap_or(""));
+                let description = json["description"].as_str().map(|s| s.to_string());
+                return Some((name, version, description));
             }
         }
     }
 
-    // Intentar leer mods.toml (Forge)
+    // Intentar leer mods.toml (Forge / NeoForge)
     if let Ok(mut forge_file) = archive.by_name("META-INF/mods.toml") {
         let mut content = String::new();
         if forge_file.read_to_string(&mut content).is_ok() {
-            // Parse TOML simple para extraer [[mods]] name y version
-            if let Some(name_line) = content.lines().find(|l| l.trim().starts_with("displayName")) {
-                if let Some(start) = name_line.find('=') {
-                    let name = name_line[start + 1..]
-                        .trim()
-                        .trim_matches('"')
-                        .to_string();
-                    let version = if let Some(ver_line) = content.lines().find(|l| l.trim().starts_with("version")) {
-                        if let Some(ver_start) = ver_line.find('=') {
-                            ver_line[ver_start + 1..]
-                                .trim()
-                                .trim_matches('"')
-                                .to_string()
-                        } else {
-                            "unknown".to_string()
-                        }
-                    } else {
-                        "unknown".to_string()
-                    };
-                    return Some((name, version));
-                }
-            }
+            let name = content.lines()
+                .find(|l| l.trim().starts_with("displayName"))
+                .and_then(|l| l.find('=').map(|i| l[i+1..].trim().trim_matches('"').to_string()))
+                .unwrap_or_else(|| "Unknown".to_string());
+            let version = sanitize_version(
+                &content.lines()
+                    .find(|l| l.trim().starts_with("version") && !l.trim().starts_with("versionRange"))
+                    .and_then(|l| l.find('=').map(|i| l[i+1..].trim().trim_matches('"').to_string()))
+                    .unwrap_or_default()
+            );
+            let description = content.lines()
+                .find(|l| l.trim().starts_with("description"))
+                .and_then(|l| l.find('=').map(|i| l[i+1..].trim().trim_matches('"').trim_matches('\'').to_string()))
+                .filter(|s| !s.is_empty() && !s.contains("${"));
+            return Some((name, version, description));
         }
     }
 
@@ -451,19 +625,16 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String)> {
         let mut content = String::new();
         if quilt_file.read_to_string(&mut content).is_ok() {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                let name = json["quilt"]["metadata"]["name"]
-                    .as_str()
-                    .unwrap_or("Unknown")
-                    .to_string();
-                let version = json["quilt"]["metadata"]["version"]
-                    .as_str()
-                    .unwrap_or("unknown")
-                    .to_string();
-                return Some((name, version));
+                let meta = &json["quilt_loader"]["metadata"];
+                let name = meta["name"].as_str().unwrap_or("Unknown").to_string();
+                let version = sanitize_version(json["quilt_loader"]["version"].as_str().unwrap_or(""));
+                let description = meta["description"].as_str().map(|s| s.to_string());
+                return Some((name, version, description));
             }
         }
     }
 
+    // Intentar leer neoforge mods.toml o pack.mcmeta como fallback
     None
 }
 
@@ -1079,6 +1250,389 @@ async fn extract_zip(zip_path: String, dest_dir: String) -> Result<(), String> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Fix 4: COMANDO: create_dir_all — crea directorio y padres
+// ─────────────────────────────────────────────────────────────────────────────
+#[tauri::command]
+async fn create_dir_all(path: String) -> Result<(), String> {
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fix 4: Resource Packs y Shaderpacks
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PackInfo {
+    pub filename: String,
+    pub name:     String,
+}
+
+fn list_packs_in_dir(dir: &PathBuf) -> Vec<PackInfo> {
+    if !dir.exists() { return Vec::new(); }
+    let mut packs = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if filename.ends_with(".zip") || entry.path().is_dir() {
+                let name = filename.replace(".zip", "");
+                packs.push(PackInfo { filename, name });
+            }
+        }
+    }
+    packs.sort_by(|a, b| a.name.cmp(&b.name));
+    packs
+}
+
+#[tauri::command]
+async fn list_resourcepacks(launcher_dir: String, instance_id: String) -> Result<Vec<PackInfo>, String> {
+    let dir = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("resourcepacks");
+    Ok(list_packs_in_dir(&dir))
+}
+
+#[tauri::command]
+async fn add_resourcepack(launcher_dir: String, instance_id: String, src_path: String) -> Result<PackInfo, String> {
+    let dest_dir = PathBuf::from(&launcher_dir).join("instances").join(&instance_id).join("resourcepacks");
+    std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+    let src = PathBuf::from(&src_path);
+    let filename = src.file_name().ok_or("Nombre de archivo inválido")?.to_string_lossy().to_string();
+    let dest = dest_dir.join(&filename);
+    std::fs::copy(&src, &dest).map_err(|e| format!("Error copiando resource pack: {}", e))?;
+    let name = filename.replace(".zip", "");
+    Ok(PackInfo { filename, name })
+}
+
+#[tauri::command]
+async fn delete_resourcepack(launcher_dir: String, instance_id: String, filename: String) -> Result<(), String> {
+    let path = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("resourcepacks").join(&filename);
+    if path.is_dir() {
+        std::fs::remove_dir_all(&path).map_err(|e| e.to_string())
+    } else {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+async fn list_shaderpacks(launcher_dir: String, instance_id: String) -> Result<Vec<PackInfo>, String> {
+    let dir = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("shaderpacks");
+    Ok(list_packs_in_dir(&dir))
+}
+
+#[tauri::command]
+async fn add_shaderpack(launcher_dir: String, instance_id: String, src_path: String) -> Result<PackInfo, String> {
+    let dest_dir = PathBuf::from(&launcher_dir).join("instances").join(&instance_id).join("shaderpacks");
+    std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+    let src = PathBuf::from(&src_path);
+    let filename = src.file_name().ok_or("Nombre de archivo inválido")?.to_string_lossy().to_string();
+    let dest = dest_dir.join(&filename);
+    std::fs::copy(&src, &dest).map_err(|e| format!("Error copiando shaderpack: {}", e))?;
+    let name = filename.replace(".zip", "");
+    Ok(PackInfo { filename, name })
+}
+
+#[tauri::command]
+async fn delete_shaderpack(launcher_dir: String, instance_id: String, filename: String) -> Result<(), String> {
+    let path = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("shaderpacks").join(&filename);
+    if path.is_dir() {
+        std::fs::remove_dir_all(&path).map_err(|e| e.to_string())
+    } else {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fix 5: Import de instancias desde ZIP/carpeta (formato CurseForge)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Metadata extraída de un manifest.json de modpack CurseForge
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModpackInspect {
+    pub name:           String,
+    #[serde(rename = "version")]
+    pub mc_version:     String,
+    pub loader:         String,
+    #[serde(rename = "loaderVersion")]
+    pub loader_version: Option<String>,
+    #[serde(rename = "modsCount")]
+    pub mods_count:     usize,
+    #[serde(rename = "hasOverrides")]
+    pub has_overrides:  bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModToDownload {
+    #[serde(rename = "projectID")]
+    pub project_id: u32,
+    #[serde(rename = "fileID")]
+    pub file_id:    u32,
+    pub required:   bool,
+    pub name:       Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ImportInstanceResult {
+    #[serde(rename = "newInstanceId")]
+    pub new_instance_id: String,
+    pub name:            String,
+    pub version:         String,
+    pub loader:          String,
+    #[serde(rename = "loaderVersion")]
+    pub loader_version:  Option<String>,
+}
+
+/// Parsea el manifest.json de CurseForge desde un directorio ya extraído
+fn parse_curseforge_manifest(dir: &PathBuf) -> Result<(serde_json::Value, ModpackInspect), String> {
+    let manifest_path = dir.join("manifest.json");
+    let content = std::fs::read_to_string(&manifest_path)
+        .map_err(|_| "No se encontró manifest.json en el directorio".to_string())?;
+    let json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Error parseando manifest.json: {}", e))?;
+
+    let name = json["name"].as_str().unwrap_or("Modpack").to_string();
+    let mc_version = json["minecraft"]["version"].as_str().unwrap_or("1.20.1").to_string();
+
+    // Parsear loader desde modLoaders[0].id  → ej: "forge-47.1.0"
+    let loader_raw = json["minecraft"]["modLoaders"]
+        .as_array()
+        .and_then(|arr| arr.first())
+        .and_then(|ml| ml["id"].as_str())
+        .unwrap_or("forge");
+
+    let (loader, loader_version) = if loader_raw.contains('-') {
+        let parts: Vec<&str> = loader_raw.splitn(2, '-').collect();
+        (parts[0].to_string(), Some(parts[1].to_string()))
+    } else {
+        (loader_raw.to_string(), None)
+    };
+
+    let mods_count = json["files"].as_array().map(|a| a.len()).unwrap_or(0);
+    let has_overrides = dir.join("overrides").exists();
+
+    // For loaders like Forge/NeoForge, the loader_version needs to be the FULL version
+    // (including MC version), not just the loader version number.
+    // E.g.: manifest has "forge-43.5.0" for MC 1.19.2 → should become "1.19.2-43.5.0"
+    let full_loader_version = match &loader as &str {
+        "forge" | "neoforge" => {
+            loader_version.map(|v| format!("{}-{}", mc_version, v))
+        }
+        _ => loader_version, // Fabric, Quilt don't need this transformation
+    };
+
+    let inspect = ModpackInspect {
+        name, mc_version, loader, loader_version: full_loader_version, mods_count, has_overrides,
+    };
+    Ok((json, inspect))
+}
+
+#[tauri::command]
+async fn inspect_instance_folder(folder_path: String) -> Result<ModpackInspect, String> {
+    let dir = PathBuf::from(&folder_path);
+    let (_, inspect) = parse_curseforge_manifest(&dir)?;
+    Ok(inspect)
+}
+
+#[tauri::command]
+async fn inspect_instance_zip(zip_path: String) -> Result<ModpackInspect, String> {
+    // Extraer a directorio temporal para inspección
+    let temp_dir = std::env::temp_dir().join(format!("minecrack_inspect_{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()));
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+
+    let file = std::fs::File::open(&zip_path).map_err(|e| format!("No se pudo abrir ZIP: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("ZIP inválido: {}", e))?;
+
+    // Solo extraer manifest.json para la inspección
+    let manifest_content = {
+        let mut mf = archive.by_name("manifest.json")
+            .map_err(|_| "El ZIP no contiene manifest.json — ¿es un modpack de CurseForge?".to_string())?;
+        let mut content = String::new();
+        mf.read_to_string(&mut content).map_err(|e| e.to_string())?;
+        content
+    };
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    // Escribir en temp para parsear
+    let temp_manifest = std::env::temp_dir().join("minecrack_manifest_temp.json");
+    std::fs::write(&temp_manifest, &manifest_content).map_err(|e| e.to_string())?;
+    let dir_for_parse = std::env::temp_dir();
+    // Renombrar para que parse_curseforge_manifest lo encuentre
+    std::fs::write(dir_for_parse.join("manifest.json"), &manifest_content).map_err(|e| e.to_string())?;
+    let (_, inspect) = parse_curseforge_manifest(&dir_for_parse)?;
+    Ok(inspect)
+}
+
+#[tauri::command]
+async fn get_mods_to_download(instance_path: String) -> Result<Vec<ModToDownload>, String> {
+    let dir = PathBuf::from(&instance_path);
+    let (json, _) = parse_curseforge_manifest(&dir)?;
+
+    let mods = json["files"]
+        .as_array()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .filter_map(|f| {
+            let project_id = f["projectID"].as_u64()? as u32;
+            let file_id    = f["fileID"].as_u64()? as u32;
+            let required   = f["required"].as_bool().unwrap_or(true);
+            Some(ModToDownload {
+                project_id,
+                file_id,
+                required,
+                name: None,
+            })
+        })
+        .collect();
+
+    Ok(mods)
+}
+
+#[tauri::command]
+async fn import_instance_from_folder(
+    launcher_dir: String,
+    folder_path: String,
+    new_name: String,
+) -> Result<ImportInstanceResult, String> {
+    let src = PathBuf::from(&folder_path);
+    let (_, inspect) = parse_curseforge_manifest(&src)?;
+
+    // Generar nuevo UUID para la instancia
+    let new_id = uuid_v4();
+    let instances_dir = PathBuf::from(&launcher_dir).join("instances").join(&new_id);
+    std::fs::create_dir_all(&instances_dir).map_err(|e| e.to_string())?;
+
+    // Copiar overrides/ si existe (config, scripts, etc.)
+    let overrides = src.join("overrides");
+    if overrides.exists() {
+        copy_dir_recursive(&overrides, &instances_dir)?;
+    }
+
+    // Copiar manifest.json a la carpeta de la instancia para que get_mods_to_download pueda leerlo después
+    let src_manifest = src.join("manifest.json");
+    if src_manifest.exists() {
+        std::fs::copy(&src_manifest, instances_dir.join("manifest.json"))
+            .map_err(|e| format!("Error copiando manifest.json: {}", e))?;
+    }
+
+    // Crear mods/ directorio vacío (los mods se descargarán después)
+    std::fs::create_dir_all(instances_dir.join("mods")).map_err(|e| e.to_string())?;
+
+    // Nombre final de la instancia
+    let final_name = if new_name.trim().is_empty() { inspect.name.clone() } else { new_name.trim().to_string() };
+
+    // Agregar entrada en instances.json
+    let instances_file = PathBuf::from(&launcher_dir).join("instances.json");
+    let mut instances: Vec<serde_json::Value> = if instances_file.exists() {
+        let data = std::fs::read_to_string(&instances_file).map_err(|e| e.to_string())?;
+        serde_json::from_str(&data).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    let now = Utc::now().to_rfc3339();
+    instances.push(serde_json::json!({
+        "id": new_id,
+        "name": final_name,
+        "version": inspect.mc_version,
+        "loader": inspect.loader,
+        "loaderVersion": inspect.loader_version,
+        "icon": "📦",
+        "ram": 2048,
+        "jvmArgs": "",
+        "installed": true,
+        "createdAt": now,
+        "lastPlayed": null,
+        "playtime": 0,
+        "modsCount": inspect.mods_count
+    }));
+
+    let json_str = serde_json::to_string_pretty(&instances).map_err(|e| e.to_string())?;
+    std::fs::write(&instances_file, json_str).map_err(|e| e.to_string())?;
+
+    Ok(ImportInstanceResult {
+        new_instance_id: new_id,
+        name:            final_name,
+        version:         inspect.mc_version,
+        loader:          inspect.loader,
+        loader_version:  inspect.loader_version,
+    })
+}
+
+#[tauri::command]
+async fn import_instance_from_zip(
+    launcher_dir: String,
+    zip_path: String,
+    new_name: String,
+) -> Result<ImportInstanceResult, String> {
+    // Extraer ZIP a directorio temporal
+    let temp_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
+    let temp_dir = PathBuf::from(&launcher_dir).join(format!("temp-import-{}", temp_id));
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+
+    // Extraer el ZIP completo
+    let file = std::fs::File::open(&zip_path).map_err(|e| format!("No se pudo abrir ZIP: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("ZIP inválido: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut zf = archive.by_index(i).map_err(|e| e.to_string())?;
+        let out_path = temp_dir.join(zf.name());
+        if zf.is_dir() {
+            std::fs::create_dir_all(&out_path).map_err(|e| e.to_string())?;
+        } else {
+            if let Some(parent) = out_path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            let mut out_file = std::fs::File::create(&out_path).map_err(|e| e.to_string())?;
+            std::io::copy(&mut zf, &mut out_file).map_err(|e| e.to_string())?;
+        }
+    }
+
+    // Importar desde la carpeta temporal
+    let result = import_instance_from_folder(launcher_dir, temp_dir.to_string_lossy().to_string(), new_name).await;
+
+    // Limpiar directorio temporal
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    result
+}
+
+#[tauri::command]
+async fn read_file_base64(path: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose};
+    let bytes = std::fs::read(&path).map_err(|e| format!("Error leyendo archivo: {}", e))?;
+    Ok(general_purpose::STANDARD.encode(&bytes))
+}
+
+/// Genera un UUID v4 simple (sin dependencia externa)
+fn uuid_v4() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    format!(
+        "{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
+        t.as_secs() as u32,
+        (t.subsec_nanos() >> 16) & 0xffff,
+        (t.subsec_nanos() >> 4) & 0x0fff,
+        0x8000 | ((t.subsec_nanos()) & 0x3fff),
+        t.as_nanos() & 0xffffffffffff
+    )
+}
+
+/// Copia recursivamente src_dir en dest_dir
+fn copy_dir_recursive(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
+    std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
+    for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dest_path)?;
+        } else {
+            std::fs::copy(&src_path, &dest_path).map_err(|e| format!("Error copiando {}: {}", src_path.display(), e))?;
+        }
+    }
+    Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // COMANDO: Verifica la integridad de una instancia
 // ─────────────────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize)]
@@ -1226,8 +1780,9 @@ async fn verify_instance(
     let loader = instance.get("loader").and_then(|l| l.as_str()).unwrap_or("vanilla");
     let loader_version = instance.get("loaderVersion").and_then(|lv| lv.as_str());
 
-    if loader != "vanilla" && loader_version.is_some() {
-        if let Ok(profile_id) = build_loader_profile_id(loader, loader_version.unwrap(), mc_version) {
+    if loader != "vanilla" {
+        if let Some(ver) = loader_version {
+            if let Ok(profile_id) = build_loader_profile_id(loader, ver, mc_version) {
             let profile_path = launcher_path
                 .join("versions")
                 .join(&profile_id)
@@ -1285,6 +1840,7 @@ async fn verify_instance(
                         }
                     }
                 }
+            }
             }
         }
     }
@@ -1462,8 +2018,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_launcher_dir,
             ensure_dir,
+            create_dir_all,
             write_file,
             read_file,
+            delete_file,
+            write_file_base64,
+            copy_file,
             file_exists,
             download_file,
             launch_game,
@@ -1479,6 +2039,20 @@ pub fn run() {
             verify_instance,
             get_repair_tasks,
             extract_zip,
+            // Fix 4: Resource packs & Shaderpacks
+            list_resourcepacks,
+            add_resourcepack,
+            delete_resourcepack,
+            list_shaderpacks,
+            add_shaderpack,
+            delete_shaderpack,
+            // Fix 5: Import de instancias
+            inspect_instance_folder,
+            inspect_instance_zip,
+            get_mods_to_download,
+            import_instance_from_folder,
+            import_instance_from_zip,
+            read_file_base64,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

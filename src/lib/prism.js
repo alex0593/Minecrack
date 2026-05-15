@@ -19,21 +19,47 @@ const BASE = API.PRISM.BASE;
 // ─── Cache en memoria ─────────────────────────────────────────────────────────
 const _cache = new Map();
 
-async function fetchPrism(url) {
+/**
+ * Fetch con retry y backoff exponencial.
+ * Reintenta solo errores transitorios: 5xx, timeouts (AbortError), network errors.
+ * 4xx pasa de largo (404 no se reintenta — fail fast).
+ */
+async function fetchPrism(url, attempt = 0) {
   if (_cache.has(url)) return _cache.get(url);
 
+  const MAX_ATTEMPTS = 3;
+  const TIMEOUT_MS = 8000;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
     const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
-    if (!res.ok) throw new Error(`HTTP ${res.status} desde Prism Meta: ${url}`);
+
+    if (!res.ok) {
+      const isTransient = res.status >= 500 && res.status < 600;
+      if (isTransient && attempt < MAX_ATTEMPTS - 1) {
+        const backoffMs = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+        console.warn(`[Prism] HTTP ${res.status}, retry ${attempt + 1}/${MAX_ATTEMPTS} en ${backoffMs}ms: ${url}`);
+        await new Promise(r => setTimeout(r, backoffMs));
+        return fetchPrism(url, attempt + 1);
+      }
+      throw new Error(`HTTP ${res.status} desde Prism Meta: ${url}`);
+    }
+
     const data = await res.json();
     _cache.set(url, data);
     return data;
   } catch (err) {
     clearTimeout(timeout);
+    // AbortError (timeout) o network error → reintentar
+    const isTransient = err.name === 'AbortError' || err.name === 'TypeError';
+    if (isTransient && attempt < MAX_ATTEMPTS - 1) {
+      const backoffMs = 1000 * Math.pow(2, attempt);
+      console.warn(`[Prism] ${err.name}, retry ${attempt + 1}/${MAX_ATTEMPTS} en ${backoffMs}ms: ${url}`);
+      await new Promise(r => setTimeout(r, backoffMs));
+      return fetchPrism(url, attempt + 1);
+    }
     throw err;
   }
 }

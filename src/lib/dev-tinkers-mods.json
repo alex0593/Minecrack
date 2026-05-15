@@ -1,0 +1,16 @@
+{
+  "TINKERS-CREATE": {
+    "mods": [
+      {"projectID": 831663, "fileID": 4894788, "name": "Create"},
+      {"projectID": 526901, "fileID": 4765726, "name": "Fabric API"},
+      {"projectID": 1028108, "fileID": 6069349, "name": "Sodium"},
+      {"projectID": 250898, "fileID": 3983796, "name": "JEI"},
+      {"projectID": 256717, "fileID": 4153347, "name": "Mantle"},
+      {"projectID": 445274, "fileID": 6375704, "name": "Alex's Mobs"},
+      {"projectID": 429371, "fileID": 4842873, "name": "Sophisticated Storage"},
+      {"projectID": 627557, "fileID": 6515577, "name": "Sophisticated Backpacks"},
+      {"projectID": 549225, "fileID": 5692394, "name": "Embeddium"},
+      {"projectID": 820727, "fileID": 5385872, "name": "Immersive Engineering"}
+    ]
+  }
+}

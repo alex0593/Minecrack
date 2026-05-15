@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../store';
-import { searchMods, getProjectVersions, getProject, getVersion, createModrinthFetcher } from '../lib/api/modrinth';
+import { searchMods, searchModpacks, getProjectVersions, getProject, getVersion, createModrinthFetcher } from '../lib/api/modrinth';
+import { searchMods as searchModsCF, searchModpacks as searchModpacksCF, isCurseForgeConfigured } from '../lib/api/curseforge';
 import { normalizeModrinthVersion } from '../lib/mods/metadata';
 import { resolveInstallPlan } from '../lib/mods/resolver';
 import { validateModCompatibility } from '../lib/mods/validator';
-import { downloadMod, getLauncherDir, listMods, tauriListen } from '../lib/tauri';
+import { downloadMod, getLauncherDir, listMods, tauriListen, importInstanceFromZip, getModsToDownload } from '../lib/tauri';
+import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
 import { LOADERS } from '../lib/instances';
 import Select from './ui/Select';
 import InstallConfirmModal from './InstallConfirmModal';
@@ -13,7 +15,7 @@ import './ModBrowserModal.css';
 const LOADERS_MODRINTH = ['fabric', 'forge', 'quilt', 'neoforge'];
 
 // ─── Tarjeta de mod en el grid ────────────────────────────────────────────────
-function ModCard({ mod, selected, onClick }) {
+function ModCard({ mod, selected, onClick, isInstalled }) {
   return (
     <button
       className={`modbrowser-card${selected ? ' selected' : ''}`}
@@ -26,7 +28,12 @@ function ModCard({ mod, selected, onClick }) {
         onError={e => { e.target.style.display = 'none'; }}
       />
       <div className="modbrowser-card-info">
-        <div className="modbrowser-card-title">{mod.title}</div>
+        <div className="modbrowser-card-title">
+          {mod.title}
+          {isInstalled && (
+            <span className="modbrowser-installed-badge">✓ Instalado</span>
+          )}
+        </div>
         <div className="modbrowser-card-desc">{mod.description}</div>
         <div className="modbrowser-card-meta">
           <span>⬇ {(mod.downloads / 1000).toFixed(0)}k</span>
@@ -38,7 +45,7 @@ function ModCard({ mod, selected, onClick }) {
 }
 
 // ─── Panel de detalle + instalación ──────────────────────────────────────────
-function ModDetail({ mod, instance, onInstalled }) {
+function ModDetail({ mod, instance, onInstalled, isModpack, filterSource }) {
   const [versions,      setVersions]      = useState([]);
   const [selectedVer,   setSelectedVer]   = useState(null);
   const [normalizedMod, setNormalizedMod] = useState(null);
@@ -291,12 +298,42 @@ export default function ModBrowserModal({ instanceId, onClose }) {
   const { state } = useStore();
   const instance  = state.instances.find(i => i.id === instanceId);
 
+  // Guard: Vanilla no soporta mods
+  if (instance?.loader === 'vanilla') {
+    return (
+      <div className="modbrowser-overlay" onClick={onClose}>
+        <div className="modbrowser-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, minHeight: 'auto' }}>
+          <div className="modbrowser-header">
+            <h2>📦 Explorar Mods</h2>
+            <button className="modal-close" onClick={onClose}>✕</button>
+          </div>
+          <div style={{ textAlign: 'center', padding: '48px 32px' }}>
+            <div style={{ fontSize: 52, marginBottom: 16 }}>🚫</div>
+            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Vanilla no soporta mods</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+              Para instalar mods necesitas cambiar el loader de la instancia a
+              <strong> Fabric</strong>, <strong>Forge</strong>, <strong>Quilt</strong> o <strong>NeoForge</strong>.
+            </p>
+          </div>
+          <div className="modal-footer" style={{ justifyContent: 'center' }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // IDs de mods ya instalados para mostrar badge "Instalado"
+  const installedIds = (state.instanceMods ?? []).map(m => m.id ?? m.slug ?? m.filename);
+
   const [query,    setQuery]    = useState('');
   const [results,  setResults]  = useState([]);
   const [total,    setTotal]    = useState(0);
   const [offset,   setOffset]   = useState(0);
   const [loading,  setLoading]  = useState(false);
   const [selected, setSelected] = useState(null);
+  const [filterSource, setFilterSource] = useState('modrinth');
+  const [filterType, setFilterType] = useState('mods'); // 'mods' | 'modpacks'
 
   const [filterVersion, setFilterVersion] = useState(instance?.version ?? '');
   const [filterLoader,  setFilterLoader]  = useState(
@@ -306,19 +343,50 @@ export default function ModBrowserModal({ instanceId, onClose }) {
   const debounceRef = useRef(null);
   const LIMIT = 20;
 
-  const doSearch = useCallback(async (q, version, loader, off = 0) => {
+  const doSearch = useCallback(async (q, version, loader, source, type, off = 0) => {
     setLoading(true);
     try {
-      const data = await searchMods({
-        query: q,
-        gameVersion: version || undefined,
-        loader: loader || undefined,
-        limit: LIMIT,
-        offset: off,
-      });
-      if (off === 0) setResults(data.hits);
-      else setResults(prev => [...prev, ...data.hits]);
-      setTotal(data.total_hits);
+      let data;
+      if (source === 'modrinth') {
+        if (type === 'mods') {
+          data = await searchMods({
+            query: q,
+            gameVersion: version || undefined,
+            loader: loader || undefined,
+            limit: LIMIT,
+            offset: off,
+          });
+        } else {
+          data = await searchModpacks({
+            query: q,
+            gameVersion: version || undefined,
+            loader: loader || undefined,
+            limit: LIMIT,
+            offset: off,
+          });
+        }
+        if (off === 0) setResults(data.hits);
+        else setResults(prev => [...prev, ...data.hits]);
+        setTotal(data.total_hits);
+      } else if (source === 'curseforge') {
+        if (type === 'mods') {
+          data = await searchModsCF(q, {
+            gameVersion: version || undefined,
+            loader: loader || undefined,
+            limit: LIMIT,
+            offset: off,
+          });
+        } else {
+          data = await searchModpacksCF(q, {
+            gameVersion: version || undefined,
+            limit: LIMIT,
+            offset: off,
+          });
+        }
+        if (off === 0) setResults(data.data);
+        else setResults(prev => [...prev, ...data.data]);
+        setTotal(data.pagination.totalCount);
+      }
       setOffset(off);
     } catch (err) {
       console.error('[ModBrowser] Error buscando:', err);
@@ -328,18 +396,18 @@ export default function ModBrowserModal({ instanceId, onClose }) {
   }, []);
 
   // Búsqueda inicial
-  useEffect(() => { doSearch(query, filterVersion, filterLoader, 0); }, []);
+  useEffect(() => { doSearch(query, filterVersion, filterLoader, filterSource, filterType, 0); }, []);
 
   // Debounce en query
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      doSearch(query, filterVersion, filterLoader, 0);
+      doSearch(query, filterVersion, filterLoader, filterSource, filterType, 0);
     }, 400);
     return () => clearTimeout(debounceRef.current);
-  }, [query, filterVersion, filterLoader]);
+  }, [query, filterVersion, filterLoader, filterSource, filterType]);
 
-  const loadMore = () => doSearch(query, filterVersion, filterLoader, offset + LIMIT);
+  const loadMore = () => doSearch(query, filterVersion, filterLoader, filterSource, filterType, offset + LIMIT);
 
   return (
     <div className="modbrowser-overlay" onClick={onClose}>
@@ -347,7 +415,7 @@ export default function ModBrowserModal({ instanceId, onClose }) {
 
         {/* Header */}
         <div className="modbrowser-header">
-          <h2>🔍 Explorar Mods — Modrinth</h2>
+          <h2>🔍 {filterType === 'mods' ? 'Explorar Mods' : 'Explorar Modpacks'}</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -355,10 +423,28 @@ export default function ModBrowserModal({ instanceId, onClose }) {
         <div className="modbrowser-filters">
           <input
             className="modbrowser-search"
-            placeholder="Buscar mods..."
+            placeholder={filterType === 'mods' ? 'Buscar mods...' : 'Buscar modpacks...'}
             value={query}
             onChange={e => setQuery(e.target.value)}
             autoFocus
+          />
+          <Select
+            size="sm"
+            value={filterType}
+            onChange={setFilterType}
+            options={[
+              { value: 'mods', label: 'Mods' },
+              { value: 'modpacks', label: 'Modpacks' },
+            ]}
+          />
+          <Select
+            size="sm"
+            value={filterSource}
+            onChange={setFilterSource}
+            options={[
+              { value: 'modrinth', label: 'Modrinth' },
+              ...(isCurseForgeConfigured() ? [{ value: 'curseforge', label: 'CurseForge' }] : []),
+            ]}
           />
           <input
             className="modbrowser-filter-input"
@@ -401,6 +487,7 @@ export default function ModBrowserModal({ instanceId, onClose }) {
                     mod={mod}
                     selected={selected?.project_id === mod.project_id}
                     onClick={() => setSelected(mod)}
+                    isInstalled={installedIds.some(id => id === mod.project_id || id === mod.slug)}
                   />
                 ))}
                 {results.length < total && (
@@ -422,6 +509,8 @@ export default function ModBrowserModal({ instanceId, onClose }) {
             <ModDetail
               mod={selected}
               instance={instance}
+              isModpack={filterType === 'modpacks'}
+              filterSource={filterSource}
               onInstalled={() => setSelected(null)}
             />
           </div>

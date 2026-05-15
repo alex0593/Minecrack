@@ -36,7 +36,7 @@ export function buildLaunchArgs({ instance, profile, javaPath, gameDirBase, asse
   const nativesDir = `${gameDir}/natives`;
 
   const jvmArgs = [
-    `-Xmx${instance.ram}M`,
+    `-Xmx${instance.ram ?? 2048}M`,
     `-Xms512M`,
     `-XX:+UseG1GC`,
     `-XX:+ParallelRefProcEnabled`,

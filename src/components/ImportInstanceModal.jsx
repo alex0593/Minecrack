@@ -1,303 +1,386 @@
-import { useState } from 'react';
-import { pickFile, pickFolder, inspectInstanceZip, inspectInstanceFolder, importInstanceFromZip, importInstanceFromFolder, getLauncherDir } from '../lib/tauri';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { pickFile, pickFolder, inspectInstanceZip, inspectInstanceFolder,
+         importInstanceFromZip, importInstanceFromFolder, getLauncherDir,
+         getModsToDownload, tauriListen } from '../lib/tauri';
+import { installVersion, installAssets } from '../lib/downloader';
 import { useStore } from '../store';
-import ProgressBar from './ui/ProgressBar';
-import ErrorModal from './ui/ErrorModal';
+import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
 import './ImportInstanceModal.css';
 
+// ─── Paso visual durante el proceso ──────────────────────────────────────────
+function StepIndicator({ steps, current }) {
+  return (
+    <div className="import-steps">
+      {steps.map((s, i) => {
+        const done    = i < current;
+        const active  = i === current;
+        return (
+          <div key={s.id} className={`import-step${done ? ' done' : active ? ' active' : ''}`}>
+            <div className="import-step-dot">
+              {done ? '✓' : <span>{i + 1}</span>}
+            </div>
+            <span className="import-step-label">{s.label}</span>
+            {i < steps.length - 1 && <div className="import-step-line" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const STEPS = [
+  { id: 'setup',    label: 'Preparar' },
+  { id: 'mc',      label: 'Minecraft' },
+  { id: 'mods',    label: 'Mods' },
+];
+
+// ─── Barra de progreso con label ─────────────────────────────────────────────
+function ProgressRow({ label, sub, value }) {
+  return (
+    <div className="import-progress-row">
+      <div className="import-progress-labels">
+        <span className="import-progress-label">{label}</span>
+        {sub && <span className="import-progress-sub">{sub}</span>}
+      </div>
+      <div className="import-progress-bar">
+        <div className="import-progress-fill" style={{ width: `${Math.min(100, value ?? 0)}%` }} />
+      </div>
+      <span className="import-progress-pct">{Math.round(value ?? 0)}%</span>
+    </div>
+  );
+}
+
+// ─── Modal principal ──────────────────────────────────────────────────────────
 export default function ImportInstanceModal({ onClose }) {
   const { dispatch } = useStore();
-  const [step, setStep] = useState('idle'); // idle | selecting | inspecting | preview | importing | done | error
-  const [sourceType, setSourceType] = useState(null); // 'folder' | 'zip'
-  const [sourcePath, setSourcePath] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [newInstanceName, setNewInstanceName] = useState('');
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState(null);
-  const [importedInstanceId, setImportedInstanceId] = useState(null);
 
-  const handleSelectFolder = async () => {
+  // Estado de la máquina
+  const [phase, setPhase] = useState('idle');
+  // idle | selecting | inspecting | preview | creating | installing-mc | downloading-mods | done | error
+
+  const [sourceType, setSourceType]     = useState(null);
+  const [sourcePath, setSourcePath]     = useState(null);
+  const [preview, setPreview]           = useState(null);
+  const [newName, setNewName]           = useState('');
+  const [error, setError]               = useState(null);
+
+  // Progreso
+  const [stepIdx, setStepIdx]           = useState(0);
+  const [progressPct, setProgressPct]   = useState(0);
+  const [progressLabel, setProgressLabel] = useState('');
+  const [progressSub, setProgressSub]   = useState('');
+
+  // Resultados
+  const [instanceId, setInstanceId]     = useState(null);
+  const [launcherDir, setLauncherDir]   = useState(null);
+  const [modsTotal, setModsTotal]       = useState(0);
+  const [modsDone, setModsDone]         = useState(0);
+  const [modsFailed, setModsFailed]     = useState(0);
+
+  const cancelRef = useRef(false);
+
+  // ── Selección ──────────────────────────────────────────────────────────────
+  const selectFile = async (type) => {
     try {
-      setStep('inspecting');
-      setProgress(0);
-      console.log('[ImportInstanceModal] Starting folder selection');
+      setPhase('inspecting');
+      const path = type === 'zip'
+        ? await pickFile({ title: 'Seleccionar ZIP de modpack (CurseForge)', filters: [{ name: 'ZIP', extensions: ['zip'] }] })
+        : await pickFolder({ title: 'Seleccionar carpeta de instancia' });
 
-      const path = await pickFolder({
-        title: 'Seleccionar carpeta de instancia'
-      });
-
-      console.log('[ImportInstanceModal] pickFolder result:', path);
-
-      if (!path) {
-        console.warn('[ImportInstanceModal] No path selected, returning to idle');
-        setStep('idle');
-        return;
-      }
+      if (!path) { setPhase('idle'); return; }
 
       setSourcePath(path);
-      setSourceType('folder');
-      setProgress(50);
+      setSourceType(type);
 
-      console.log('[ImportInstanceModal] Inspecting folder:', path);
-      const inspection = await inspectInstanceFolder(path);
-      console.log('[ImportInstanceModal] Inspection result:', inspection);
-      setProgress(100);
-
-      setPreview(inspection);
-      setNewInstanceName(inspection.name ? `${inspection.name} (copia)` : 'Nueva instancia');
-      setStep('preview');
-      console.log('[ImportInstanceModal] Transitioned to preview step');
+      const info = type === 'zip' ? await inspectInstanceZip(path) : await inspectInstanceFolder(path);
+      setPreview(info);
+      setNewName(info.name ? `${info.name}` : 'Nueva instancia');
+      setPhase('preview');
     } catch (err) {
-      console.error('[ImportInstanceModal] Error in handleSelectFolder:', err);
-      const errorMessage = err?.message || (typeof err === 'string' ? err : 'Error desconocido');
-      const errorDetails = err?.stack || (typeof err === 'string' ? '' : JSON.stringify(err));
-      setError({
-        message: `Error inspeccionar carpeta: ${errorMessage}`,
-        details: errorDetails
-      });
-      setStep('error');
+      setError(err?.message || String(err));
+      setPhase('error');
     }
   };
 
-  const handleSelectZip = async () => {
-    try {
-      setStep('inspecting');
-      setProgress(0);
-      console.log('[ImportInstanceModal] Starting ZIP selection');
-
-      const path = await pickFile({
-        title: 'Seleccionar ZIP de instancia',
-        filters: [{ name: 'ZIP', extensions: ['zip'] }]
-      });
-
-      console.log('[ImportInstanceModal] pickFile result:', path);
-
-      if (!path) {
-        console.warn('[ImportInstanceModal] No path selected, returning to idle');
-        setStep('idle');
-        return;
-      }
-
-      setSourcePath(path);
-      setSourceType('zip');
-      setProgress(50);
-
-      console.log('[ImportInstanceModal] Inspecting ZIP:', path);
-      const inspection = await inspectInstanceZip(path);
-      console.log('[ImportInstanceModal] Inspection result:', inspection);
-      setProgress(100);
-
-      setPreview(inspection);
-      setNewInstanceName(inspection.name ? `${inspection.name} (copia)` : 'Nueva instancia');
-      setStep('preview');
-      console.log('[ImportInstanceModal] Transitioned to preview step');
-    } catch (err) {
-      console.error('[ImportInstanceModal] Error in handleSelectZip:', err);
-      const errorMessage = err?.message || (typeof err === 'string' ? err : 'Error desconocido');
-      const errorDetails = err?.stack || (typeof err === 'string' ? '' : JSON.stringify(err));
-      setError({
-        message: `Error inspeccionar ZIP: ${errorMessage}`,
-        details: errorDetails
-      });
-      setStep('error');
-    }
-  };
-
+  // ── Importar ───────────────────────────────────────────────────────────────
   const handleImport = async () => {
-    console.log('[ImportInstanceModal] handleImport called', { sourcePath, newInstanceName });
-
-    if (!sourcePath || !newInstanceName) {
-      console.warn('[ImportInstanceModal] Missing sourcePath or newInstanceName, aborting import');
-      return;
-    }
+    cancelRef.current = false;
+    const dir = await getLauncherDir();
+    setLauncherDir(dir);
 
     try {
-      setStep('importing');
-      setProgress(0);
+      // ── Paso 0: Crear instancia en disco ────────────────────────────────
+      setPhase('creating');
+      setStepIdx(0);
+      setProgressPct(10);
+      setProgressLabel('Creando instancia...');
 
-      console.log('[ImportInstanceModal] Getting launcher directory');
-      const launcherDir = await getLauncherDir();
-      console.log('[ImportInstanceModal] Launcher dir:', launcherDir);
+      const result = sourceType === 'zip'
+        ? await importInstanceFromZip(dir, sourcePath, newName)
+        : await importInstanceFromFolder(dir, sourcePath, newName);
 
-      // Simular progreso
-      const progressInterval = setInterval(() => {
-        setProgress(p => Math.min(90, p + Math.random() * 20));
-      }, 200);
+      const newId = result.newInstanceId;
+      setInstanceId(newId);
 
-      console.log('[ImportInstanceModal] Starting import, sourceType:', sourceType);
-      const result = sourceType === 'folder'
-        ? await importInstanceFromFolder(launcherDir, sourcePath, newInstanceName)
-        : await importInstanceFromZip(launcherDir, sourcePath, newInstanceName);
+      // Agregar al store (sin instalar todavía)
+      dispatch({
+        type: 'ADD_INSTANCE',
+        payload: {
+          id: newId,
+          name: newName,
+          version: preview?.version || '1.20.1',
+          loader: preview?.loader || 'vanilla',
+          loaderVersion: result.loaderVersion || preview?.loaderVersion || null,
+          icon: '📦',
+          ram: 2048,
+          jvmArgs: '',
+          installed: false,
+          lastPlayed: null,
+          modsCount: preview?.modsCount || 0,
+        },
+      });
 
-      console.log('[ImportInstanceModal] Import result:', result);
-      clearInterval(progressInterval);
-      setProgress(100);
+      // ── Paso 1: Instalar Minecraft + loader ─────────────────────────────
+      setPhase('installing-mc');
+      setStepIdx(1);
+      setProgressPct(0);
+      setProgressLabel('Instalando Minecraft...');
 
-      setImportedInstanceId(result.newInstanceId);
-
-      // Crear objeto de instancia para agregar al store
-      const newInstance = {
-        id: result.newInstanceId,
-        name: newInstanceName,
-        version: preview?.version || '1.20.1',
+      const instance = {
+        id: newId,
         loader: preview?.loader || 'vanilla',
-        icon: '📦',
-        installed: true,
-        lastPlayed: new Date().toISOString(),
+        loaderVersion: result.loaderVersion || preview?.loaderVersion || null,
       };
 
-      console.log('[ImportInstanceModal] Adding new instance to store:', newInstance);
-      dispatch({ type: 'ADD_INSTANCE', payload: newInstance });
+      // Progreso de archivos
+      const handleMCProgress = ({ done: d, total: t, label, phase: ph }) => {
+        if (t > 0) setProgressPct(Math.round((d / t) * 80));
+        if (label) setProgressLabel(label);
+        if (ph === 'assets') setProgressSub('Descargando sonidos y texturas...');
+        else if (ph === 'libraries') setProgressSub('Descargando librerías...');
+        else if (ph === 'loader') setProgressSub('Instalando loader...');
+        else setProgressSub('');
+      };
 
-      setStep('done');
+      // Escuchar eventos de bytes para velocidad visual
+      let unlisten;
+      tauriListen('download://progress', (payload) => {
+        if (payload.total > 0) {
+          setProgressSub(`${payload.file} — ${Math.round((payload.received / payload.total) * 100)}%`);
+        }
+      }).then(fn => { unlisten = fn; });
 
-      // La instancia ya está en el store y aparecerá en el sidebar
-      console.log('[ImportInstanceModal] Import completed successfully');
+      const { versionData, assetIndexInfo, loaderVersion: installedLoaderVer } =
+        await installVersion(preview?.version || '1.20.1', dir, instance, handleMCProgress, () => {});
 
-      setTimeout(() => {
-        console.log('[ImportInstanceModal] Closing modal');
-        onClose();
-      }, 2000);
-    } catch (err) {
-      console.error('[ImportInstanceModal] Error in handleImport:', err);
-      const errorMessage = err?.message || (typeof err === 'string' ? err : 'Error desconocido');
-      const errorDetails = err?.stack || (typeof err === 'string' ? '' : JSON.stringify(err));
-      setError({
-        message: `Error importando instancia: ${errorMessage}`,
-        details: errorDetails
+      setProgressPct(85);
+      setProgressLabel('Descargando assets (sonidos, texturas)...');
+      setProgressSub('');
+
+      await installAssets(assetIndexInfo, dir, handleMCProgress, () => {});
+      unlisten?.();
+
+      // Marcar como instalada
+      dispatch({
+        type: 'UPDATE_INSTANCE',
+        payload: {
+          id: newId,
+          installed: true,
+          loaderVersion: installedLoaderVer || result.loaderVersion,
+        },
       });
-      setStep('error');
+
+      // ── Paso 2: Descargar mods ──────────────────────────────────────────
+      const instanceFolder = `${dir}/instances/${newId}`;
+      const mods = await getModsToDownload(instanceFolder).catch(() => []);
+
+      if (!mods || mods.length === 0) {
+        setPhase('done');
+        return;
+      }
+
+      setPhase('downloading-mods');
+      setStepIdx(2);
+      setProgressPct(0);
+      setProgressLabel(`Descargando ${mods.length} mods...`);
+      setModsTotal(mods.length);
+      setModsDone(0);
+      setModsFailed(0);
+
+      await downloadMultipleModsFromCurseForge(dir, newId, mods, (info) => {
+        if (info.status === 'progress') {
+          setModsDone(info.downloaded || 0);
+          setModsFailed(info.failed || 0);
+          setProgressPct(info.percent ?? 0);
+          setProgressLabel(info.label || '');
+        }
+      });
+
+      setPhase('done');
+
+    } catch (err) {
+      setError(err?.message || String(err));
+      setPhase('error');
     }
   };
 
-  // Error modal
-  if (error && step === 'error') {
+  // ── Auto-cierre al terminar ────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase === 'done') {
+      const t = setTimeout(onClose, 2500);
+      return () => clearTimeout(t);
+    }
+  }, [phase]);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════════════════
+
+  // Error
+  if (phase === 'error') {
     return (
-      <ErrorModal
-        message={error.message}
-        details={error.details}
-        onClose={() => {
-          setError(null);
-          setStep('idle');
-        }}
-        open
-      />
-    );
-  }
-
-  // Importando...
-  if (step === 'importing' || step === 'done') {
-    return (
-      <div className="modal-overlay">
-        <div className="modal-content import-instance-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>{step === 'done' ? '✓ Importada' : '📥 Importando instancia'}</h2>
+      <div className="import-overlay" onClick={onClose}>
+        <div className="import-modal" onClick={e => e.stopPropagation()}>
+          <div className="import-error-header">
+            <span style={{ fontSize: 28 }}>❌</span>
+            <h2>Error al importar</h2>
           </div>
-
-          <div className="modal-body" style={{ paddingTop: 24 }}>
-            {step === 'done' ? (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 12 }}>✓</div>
-                <p style={{ color: 'var(--text-primary)', fontSize: 14, margin: 0 }}>
-                  {newInstanceName}
-                </p>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8, margin: 0 }}>
-                  Instancia creada e importada correctamente
-                </p>
-                {preview && (
-                  <>
-                    <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8, margin: 0 }}>
-                      {preview.version} • {preview.loader} • {preview.modsCount} mods
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : (
-              <>
-                <ProgressBar
-                  value={progress}
-                  max={100}
-                  label={`${Math.round(progress)}%`}
-                  animated
-                  style={{ marginBottom: 16 }}
-                />
-                <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
-                  Copiando archivos de instancia...
-                </p>
-              </>
-            )}
+          <pre className="import-error-msg">{error}</pre>
+          <div className="import-footer">
+            <button className="btn btn-ghost" onClick={() => { setError(null); setPhase('idle'); }}>
+              Volver a intentar
+            </button>
+            <button className="btn btn-primary" onClick={onClose}>Cerrar</button>
           </div>
-
-          {step !== 'done' && (
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={onClose} disabled={step === 'done'}>
-                Cancelar
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
   }
 
-  // Preview
-  if (step === 'preview' && preview) {
+  // En proceso (creating / installing-mc / downloading-mods / done)
+  if (['creating', 'installing-mc', 'downloading-mods', 'done'].includes(phase)) {
+    const isDone = phase === 'done';
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content import-instance-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>📥 Vista previa de instancia</h2>
-            <button className="modal-close" onClick={onClose}>✕</button>
+      <div className="import-overlay">
+        <div className="import-modal import-modal-progress" onClick={e => e.stopPropagation()}>
+
+          {/* Título */}
+          <div className="import-progress-header">
+            {isDone
+              ? <><span className="import-done-icon">✅</span><h2>¡Importación completa!</h2></>
+              : <><div className="import-spinner" /><h2>Importando {newName}</h2></>
+            }
           </div>
 
-          <div className="modal-body">
-            {/* Información de instancia */}
-            <div className="import-preview-section">
-              <h3>Información</h3>
-              <div className="import-preview-info">
-                <div className="import-preview-row">
-                  <span className="import-preview-label">Nombre</span>
-                  <span className="import-preview-value">{preview.name || 'Sin nombre'}</span>
-                </div>
-                <div className="import-preview-row">
-                  <span className="import-preview-label">Minecraft</span>
-                  <span className="import-preview-value">{preview.version || 'Desconocida'}</span>
-                </div>
-                <div className="import-preview-row">
-                  <span className="import-preview-label">Loader</span>
-                  <span className="import-preview-value">{preview.loader || 'Vanilla'}</span>
-                </div>
-                <div className="import-preview-row">
-                  <span className="import-preview-label">Mods</span>
-                  <span className="import-preview-value">{preview.modsCount || 0}</span>
-                </div>
+          {/* Indicador de pasos */}
+          <StepIndicator steps={STEPS} current={stepIdx} />
+
+          {/* Barra de progreso */}
+          {!isDone && (
+            <ProgressRow
+              label={progressLabel || 'Procesando...'}
+              sub={progressSub}
+              value={progressPct}
+            />
+          )}
+
+          {/* Resumen de mods si estamos en esa fase */}
+          {(phase === 'downloading-mods' || isDone) && modsTotal > 0 && (
+            <div className="import-mods-summary">
+              <span>Mods: <strong>{modsDone}/{modsTotal}</strong></span>
+              {modsFailed > 0 && <span className="import-mods-failed">{modsFailed} fallidos</span>}
+            </div>
+          )}
+
+          {isDone && (
+            <div className="import-done-info">
+              <span>{preview?.version} · {preview?.loader}</span>
+              {modsTotal > 0 && <span>{modsDone} mods instalados</span>}
+            </div>
+          )}
+
+        </div>
+      </div>
+    );
+  }
+
+  // Preview (confirmación)
+  if (phase === 'preview' && preview) {
+    const loaderColor = {
+      forge: 'var(--amber)', fabric: 'var(--blue)',
+      quilt: 'var(--purple)', neoforge: 'var(--red)',
+    }[preview.loader] || 'var(--text-secondary)';
+
+    return (
+      <div className="import-overlay" onClick={onClose}>
+        <div className="import-modal" onClick={e => e.stopPropagation()}>
+
+          <div className="import-header">
+            <div className="import-header-icon">📦</div>
+            <div>
+              <h2 className="import-title">Importar modpack</h2>
+              <p className="import-subtitle">Revisa la información antes de importar</p>
+            </div>
+            <button className="import-close" onClick={onClose}>✕</button>
+          </div>
+
+          {/* Info del pack */}
+          <div className="import-pack-info">
+            <div className="import-pack-name">{preview.name || 'Modpack'}</div>
+            <div className="import-pack-tags">
+              <span className="import-tag">{preview.version || '?'}</span>
+              <span className="import-tag" style={{ color: loaderColor, borderColor: loaderColor }}>
+                {preview.loader || 'vanilla'}
+              </span>
+              {preview.modsCount > 0 && (
+                <span className="import-tag">{preview.modsCount} mods</span>
+              )}
+            </div>
+          </div>
+
+          {/* Pasos que se ejecutarán */}
+          <div className="import-plan">
+            <div className="import-plan-title">Lo que se instalará:</div>
+            <div className="import-plan-steps">
+              <div className="import-plan-step">
+                <span>⬇</span> Minecraft {preview.version}
               </div>
-            </div>
-
-            {/* Nombre de nueva instancia */}
-            <div className="import-preview-section">
-              <h3>Nueva instancia</h3>
-              <input
-                type="text"
-                className="input"
-                value={newInstanceName}
-                onChange={(e) => setNewInstanceName(e.target.value)}
-                placeholder="Nombre de la instancia"
-              />
-              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-                La instancia será creada con un nuevo UUID para evitar conflictos
-              </p>
+              {preview.loader && preview.loader !== 'vanilla' && (
+                <div className="import-plan-step">
+                  <span>⬇</span> {preview.loader} {preview.loaderVersion ? `(${preview.loaderVersion})` : ''}
+                </div>
+              )}
+              {preview.modsCount > 0 && (
+                <div className="import-plan-step">
+                  <span>⬇</span> {preview.modsCount} mods desde CurseForge
+                </div>
+              )}
+              {preview.hasOverrides && (
+                <div className="import-plan-step">
+                  <span>📂</span> Configuración y overrides
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="modal-footer">
-            <button className="btn btn-ghost" onClick={onClose}>
-              Cancelar
-            </button>
+          {/* Nombre */}
+          <div className="import-field">
+            <label className="import-field-label">Nombre de la instancia</label>
+            <input
+              className="input"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="Nombre..."
+              autoFocus
+            />
+          </div>
+
+          <div className="import-footer">
+            <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
             <button
               className="btn btn-primary"
               onClick={handleImport}
-              disabled={!newInstanceName}
+              disabled={!newName.trim()}
             >
               📥 Importar
             </button>
@@ -307,44 +390,50 @@ export default function ImportInstanceModal({ onClose }) {
     );
   }
 
-  // Selección de fuente (carpeta o ZIP)
-  if (step === 'selecting') {
+  // Inspecting (loading)
+  if (phase === 'inspecting') {
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content import-instance-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>¿De dónde importar?</h2>
-            <button className="modal-close" onClick={onClose}>✕</button>
+      <div className="import-overlay">
+        <div className="import-modal import-modal-sm" onClick={e => e.stopPropagation()}>
+          <div className="import-loading">
+            <div className="import-spinner" />
+            <span>Leyendo archivo...</span>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          <div className="modal-body">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <button
-                className="import-source-btn"
-                onClick={handleSelectFolder}
-              >
-                <span style={{ fontSize: 32 }}>📁</span>
-                <div>
-                  <div className="import-source-title">Desde carpeta</div>
-                  <div className="import-source-desc">Seleccionar carpeta con instancia existente</div>
-                </div>
-              </button>
-              <button
-                className="import-source-btn"
-                onClick={handleSelectZip}
-              >
-                <span style={{ fontSize: 32 }}>📦</span>
-                <div>
-                  <div className="import-source-title">Desde ZIP</div>
-                  <div className="import-source-desc">Seleccionar archivo ZIP exportado</div>
-                </div>
-              </button>
+  // Selección de origen
+  if (phase === 'selecting') {
+    return (
+      <div className="import-overlay" onClick={onClose}>
+        <div className="import-modal import-modal-sm" onClick={e => e.stopPropagation()}>
+          <div className="import-header">
+            <div className="import-header-icon">📥</div>
+            <div>
+              <h2 className="import-title">¿De dónde importar?</h2>
+              <p className="import-subtitle">Selecciona el origen del modpack</p>
             </div>
+            <button className="import-close" onClick={onClose}>✕</button>
           </div>
 
-          <div className="modal-footer">
-            <button className="btn btn-ghost" onClick={onClose}>
-              Cancelar
+          <div className="import-sources">
+            <button className="import-source-card" onClick={() => selectFile('zip')}>
+              <span className="import-source-icon">📦</span>
+              <div>
+                <div className="import-source-title">Archivo ZIP</div>
+                <div className="import-source-desc">Modpack de CurseForge (.zip)</div>
+              </div>
+              <span className="import-source-arrow">→</span>
+            </button>
+            <button className="import-source-card" onClick={() => selectFile('folder')}>
+              <span className="import-source-icon">📁</span>
+              <div>
+                <div className="import-source-title">Carpeta</div>
+                <div className="import-source-desc">Instancia existente en carpeta</div>
+              </div>
+              <span className="import-source-arrow">→</span>
             </button>
           </div>
         </div>
@@ -352,29 +441,28 @@ export default function ImportInstanceModal({ onClose }) {
     );
   }
 
-  // Estado inicial: botones principales
+  // Estado idle (pantalla inicial)
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content import-instance-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>📥 Importar instancia</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+    <div className="import-overlay" onClick={onClose}>
+      <div className="import-modal import-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="import-header">
+          <div className="import-header-icon">📥</div>
+          <div>
+            <h2 className="import-title">Importar instancia</h2>
+            <p className="import-subtitle">Importa un modpack de CurseForge o una instancia existente</p>
+          </div>
+          <button className="import-close" onClick={onClose}>✕</button>
         </div>
 
-        <div className="modal-body">
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
-            Importa una instancia completa (con mods, configuración y saves) desde una carpeta o archivo ZIP.
-          </p>
+        <div className="import-idle-features">
+          <div className="import-feature"><span>✓</span> Instala Minecraft y el modloader automáticamente</div>
+          <div className="import-feature"><span>✓</span> Descarga todos los mods desde CurseForge</div>
+          <div className="import-feature"><span>✓</span> Copia configuración y saves del pack</div>
         </div>
 
-        <div className="modal-footer">
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancelar
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => setStep('selecting')}
-          >
+        <div className="import-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={() => setPhase('selecting')}>
             📥 Importar
           </button>
         </div>

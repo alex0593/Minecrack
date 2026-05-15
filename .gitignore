@@ -28,3 +28,7 @@ dist-ssr
 .env.local
 .env.*.local
 # .env.example SÍ se sube (es la plantilla sin keys reales)
+
+# Modpacks / Zips
+*.zip
+TINKERS-CREATE.zip

@@ -13,11 +13,9 @@
 
 - **🛡️ Modo Offline Nativo:** Juega sin necesidad de autenticación de Microsoft. Generación automática de perfiles y UUIDs offline compatibles.
 - **📦 Gestión de Instancias:** Crea, configura y lanza múltiples versiones de Minecraft de forma independiente.
-- **🛠️ Soporte Multicargador:** Integración completa con:
-  - **Vanilla** (Versiones oficiales)
-  - **Fabric** (Con resolución inteligente de dependencias ASM/Mixin)
-  - **Quilt**
-  - **Forge** (Vía Prism Meta API)
+- **🛠️ Soporte Multicargador:** Integración completa con **Vanilla**, **Fabric**, **Quilt** y **Forge/NeoForge** (Vía Prism Meta API y resolución robusta).
+- **🌐 Navegador Unificado de Modpacks:** Explora e instala modpacks desde CurseForge y Modrinth directamente desde la interfaz.
+- **👕 Skins Automáticos offline:** Integración con CustomSkinLoader para usar skins personalizados (PNG) directamente en el launcher.
 - **🚀 Lanzamiento Optimizado:** Detección automática de JRE (Java 17+), construcción dinámica de Classpath y deduplicación de argumentos JVM.
 - **📥 Sistema de Descargas en Dos Fases:**
   1. **Fase de Librerías:** Descarga concurrente de binarios y dependencias nativas.
@@ -97,6 +95,13 @@ El flujo de lanzamiento de una instancia sigue estos pasos críticos:
 2. **Resolución de Variables:** Se procesan placeholders como `${natives_directory}` y `${launcher_name}`.
 3. **Classpath Building:** Se genera la cadena de librerías necesaria según la versión y el cargador de mods.
 4. **Subprocess Spawn:** El backend de Rust inicia la JVM, capturando los logs para mostrarlos en la consola del launcher vía eventos.
+
+---
+
+## 📚 Documentación de Desarrollo
+
+- **Arquitectura y Proyecto:**
+  - [`CLAUDE.md`](./CLAUDE.md): Guía principal de arquitectura, IPC (React-Rust), manejo de estado global y el estado actual de implementaciones (Fase 4).
 
 ---
 

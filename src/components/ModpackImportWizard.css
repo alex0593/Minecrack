@@ -1,0 +1,576 @@
+/* ModpackImportWizard.css - Unified 4-step modpack import wizard */
+
+/* ─── Modal Layout ─────────────────────────────────────────────────────────── */
+.wizard-modal {
+  position: relative;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Step Indicator ───────────────────────────────────────────────────────── */
+.wizard-steps-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-md);
+  padding: var(--gap-lg) var(--gap-xl);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.wizard-step-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-base);
+  border: 2px solid var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.wizard-step-dot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-base);
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.3);
+}
+
+.wizard-step-dot.done {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-base);
+}
+
+.wizard-step-line {
+  width: 40px;
+  height: 2px;
+  background: var(--text-muted);
+  transition: background 0.2s ease;
+}
+
+/* ─── Main Content Area ────────────────────────────────────────────────────── */
+.wizard-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap-xl);
+}
+
+.wizard-content > div {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Close Button ─────────────────────────────────────────────────────────── */
+.wizard-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wizard-close-btn:hover {
+  color: var(--text-primary);
+}
+
+/* ─── Step 1: Search ───────────────────────────────────────────────────────── */
+.wizard-step-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+}
+
+.wizard-step-search h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.wizard-tabs {
+  display: flex;
+  gap: var(--gap-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.wizard-tab {
+  padding: var(--gap-md) var(--gap-lg);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.wizard-tab:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.wizard-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.wizard-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wizard-search-section {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: var(--gap-md);
+}
+
+.wizard-search-input {
+  padding: var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.wizard-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.1);
+}
+
+.wizard-version-select {
+  padding: var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.wizard-version-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.wizard-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--gap-lg);
+}
+
+.wizard-modpack-card {
+  background: var(--bg-base);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--gap-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.wizard-modpack-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 230, 118, 0.1);
+}
+
+.wizard-modpack-card.selected {
+  border-color: var(--accent);
+  background: rgba(0, 230, 118, 0.05);
+}
+
+.wizard-card-icon {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--gap-md);
+}
+
+.wizard-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.wizard-card-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.wizard-card-author {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.wizard-card-desc {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wizard-card-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.wizard-loading,
+.wizard-no-results {
+  text-align: center;
+  padding: var(--gap-xl);
+  color: var(--text-secondary);
+}
+
+.wizard-error {
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--gap-md);
+  color: #ff6b6b;
+  font-size: 14px;
+  margin: var(--gap-md) 0;
+}
+
+/* ─── Step 2: Preview ──────────────────────────────────────────────────────── */
+.wizard-step-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+}
+
+.wizard-step-preview h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.wizard-preview-header {
+  display: flex;
+  gap: var(--gap-lg);
+  background: var(--bg-base);
+  padding: var(--gap-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.wizard-preview-icon {
+  width: 160px;
+  height: 160px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.wizard-preview-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.wizard-preview-info h3 {
+  margin: 0 0 var(--gap-sm) 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.wizard-preview-author {
+  margin: 0 0 var(--gap-md) 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.wizard-preview-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wizard-version-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.wizard-version-selector label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.wizard-version-selector select {
+  padding: var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* ─── Step 3: Configuration ────────────────────────────────────────────────── */
+.wizard-step-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+}
+
+.wizard-step-config h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.wizard-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.wizard-form-group label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.wizard-form-group input,
+.wizard-form-group select,
+.wizard-form-group textarea {
+  padding: var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.wizard-form-group input:focus,
+.wizard-form-group select:focus,
+.wizard-form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.1);
+}
+
+.wizard-icon-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--gap-sm);
+}
+
+.wizard-icon-btn {
+  aspect-ratio: 1;
+  background: var(--bg-base);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wizard-icon-btn:hover {
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+.wizard-icon-btn.selected {
+  border-color: var(--accent);
+  background: rgba(0, 230, 118, 0.1);
+}
+
+.wizard-config-info {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--gap-md);
+  font-size: 13px;
+}
+
+.wizard-config-info strong {
+  color: var(--text-primary);
+}
+
+.wizard-config-info p {
+  margin: var(--gap-xs) 0;
+  color: var(--text-secondary);
+}
+
+/* ─── Step 4: Installation ─────────────────────────────────────────────────── */
+.wizard-step-install {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.wizard-step-install h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.wizard-progress-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+  margin-top: var(--gap-md);
+}
+
+.wizard-installing {
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: var(--gap-lg);
+}
+
+.wizard-success {
+  background: rgba(0, 230, 118, 0.1);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--gap-lg);
+  text-align: center;
+  color: var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+  align-items: center;
+  margin-top: var(--gap-lg);
+}
+
+/* ─── Buttons ──────────────────────────────────────────────────────────────── */
+.wizard-button-group {
+  display: flex;
+  gap: var(--gap-md);
+  justify-content: flex-end;
+  margin-top: var(--gap-lg);
+}
+
+.btn {
+  padding: var(--gap-md) var(--gap-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .wizard-modal {
+    max-width: 95%;
+    max-height: 95vh;
+  }
+
+  .wizard-content {
+    padding: var(--gap-lg);
+  }
+
+  .wizard-search-section {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-results-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-preview-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .wizard-preview-icon {
+    width: 120px;
+    height: 120px;
+  }
+
+  .wizard-icon-picker {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .wizard-button-group {
+    flex-direction: column-reverse;
+  }
+
+  .wizard-button-group .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .wizard-steps-indicator {
+    gap: var(--gap-sm);
+    padding: var(--gap-md);
+  }
+
+  .wizard-step-dot {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .wizard-step-line {
+    width: 20px;
+  }
+
+  .wizard-icon-picker {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

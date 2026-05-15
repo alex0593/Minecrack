@@ -4,11 +4,9 @@ import { useStore } from '../store';
 import { LOADERS } from '../lib/instances';
 import { formatRelativeTime } from '../lib/format';
 import ImportInstanceModal from './ImportInstanceModal';
-import ModpackDownloadModal from './ModpackDownloadModal';
 
 export default function Sidebar() {
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showModpackModal, setShowModpackModal] = useState(false);
   const { state, dispatch, openModal } = useStore();
   const { instances, selectedInstanceId, activeTab, profile, profileReady, gameRunning, gameInstanceId } = state;
 
@@ -70,7 +68,7 @@ export default function Sidebar() {
         <button
           id="btn-download-modpack-sidebar"
           className="sidebar-nav-item"
-          onClick={() => setShowModpackModal(true)}
+          onClick={() => openModal('modpackImport')}
           title="Descargar modpack desde CurseForge o Modrinth"
         >
           <span className="nav-icon">📦</span>
@@ -152,13 +150,6 @@ export default function Sidebar() {
       {showImportModal && (
         <ImportInstanceModal
           onClose={() => setShowImportModal(false)}
-        />
-      )}
-
-      {/* Download modpack modal */}
-      {showModpackModal && (
-        <ModpackDownloadModal
-          onClose={() => setShowModpackModal(false)}
         />
       )}
 

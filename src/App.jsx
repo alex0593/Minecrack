@@ -15,6 +15,7 @@ import ResourcePackBrowserModal from './components/ResourcePackBrowserModal';
 import ShaderPackBrowserModal from './components/ShaderPackBrowserModal';
 import InstanceSettingsModal from './components/InstanceSettingsModal';
 import VerifyInstanceModal   from './components/VerifyInstanceModal';
+import ModpackImportWizard   from './components/ModpackImportWizard';
 import SetupWizard           from './components/SetupWizard';
 
 function ErrorModal() {
@@ -117,6 +118,9 @@ function Modals() {
       }}
       onCancel={closeModal}
     />
+  );
+  if (modal === 'modpackImport') return (
+    <ModpackImportWizard onClose={closeModal} />
   );
   return null;
 }

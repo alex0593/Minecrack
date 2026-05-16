@@ -372,39 +372,21 @@ export async function launchGameInstance({ instance, profile, launcherDir, versi
           versionData.mainClass = loaderProfile.mainClass;
         }
 
-        // Argumentos del juego: fusionar los del loader con vanilla, no reemplazar.
-        // CRÍTICO: Mantener versionData.arguments (contiene --assetsDir, --assetIndex)
-        // Los args del loader (--launchTarget, --fml.forgeVersion) se AÑADEN al array.
+        // Argumentos del juego: el loader proporciona args complementarias (--launchTarget, --fml.*)
+        // IMPORTANTE: NO anular versionData.arguments (Rust lo usa para assets)
+        // Proporcionar minecraftArguments del loader también, pero Rust prioriza arguments
         if (loaderProfile.minecraftArguments) {
-          // Loader usa formato legacy (string) - típico en Forge/ForgeWrapper
-          // Dividimos sus args y los añadimos al array moderno de vanilla
-          if (versionData.arguments && typeof versionData.arguments === 'object') {
-            const argsMap = versionData.arguments;
-            if (argsMap.game && Array.isArray(argsMap.game)) {
-              // Split loader's minecraftArguments y append al array de game args
-              const loaderTokens = loaderProfile.minecraftArguments.split(/\s+/).filter(t => t);
-              argsMap.game = [...argsMap.game, ...loaderTokens];
-              console.log(`[Launcher] ✓ Agregados ${loaderTokens.length} argumentos de ${instance.loader} al game arguments (preservando assets)`);
-            }
-          } else {
-            // Fallback: si no hay formato moderno, usar el legacy del loader
-            versionData.minecraftArguments = loaderProfile.minecraftArguments;
-            console.log(`[Launcher] ✓ Usando minecraftArguments de ${instance.loader} (fallback a legacy)`);
-          }
-        } else if (loaderProfile.arguments) {
-          // Loader usa formato moderno (array) — fusiona con vanilla
-          if (versionData.arguments && typeof versionData.arguments === 'object' &&
-              loaderProfile.arguments && typeof loaderProfile.arguments === 'object') {
-            // Merge ambos arrays de game args
-            const vanillaGameArgs = versionData.arguments.game || [];
-            const loaderGameArgs = loaderProfile.arguments.game || [];
-            versionData.arguments.game = [...vanillaGameArgs, ...loaderGameArgs];
-            console.log(`[Launcher] ✓ Fusionados arguments de ${instance.loader} (moderno + vanilla)`);
-          } else {
-            // Fallback: reemplazar enteros
-            versionData.arguments = loaderProfile.arguments;
-            console.log(`[Launcher] ✓ Usando arguments de ${instance.loader} (reemplazo)`);
-          }
+          // Loader usa formato legacy (string) — Forge/ForgeWrapper con args completas
+          // Guardamos pero no reemplazamos arguments (Rust las usará si existen)
+          versionData.minecraftArguments = loaderProfile.minecraftArguments;
+          console.log(`[Launcher] ✓ minecraftArguments de ${instance.loader} disponible (Rust usará arguments si existen)`);
+        }
+
+        if (loaderProfile.arguments) {
+          // Loader usa formato moderno (array) — NeoForge u otro loader moderno
+          // Reemplazar arguments completamente (el loader proporciona un conjunto completo)
+          versionData.arguments = loaderProfile.arguments;
+          console.log(`[Launcher] ✓ Usando arguments de ${instance.loader} (formato moderno)`);
         }
 
         // CRÍTICO: Agregar librerías del loader (ej: ForgeWrapper, securejarhandler, etc.)

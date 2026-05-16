@@ -7,7 +7,7 @@
  * PASO 4: INSTALACIÓN — Progress tracking and completion
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Component } from 'react';
 import { useStore } from '../store';
 import { searchModpacks as searchModrinthPacks } from '../lib/api/modrinth';
 import {
@@ -615,7 +615,37 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
   );
 }
 
-// ─── Main Wizard Component ───────────────────────────────────────────────────
+// ─── Error Boundary ─────────────────────────────────────────────────────────
+class WizardErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[ModpackWizard] React render error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="wizard-container">
+          <div className="wizard-modal" style={{ justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+            <h2 style={{ color: 'var(--red)', marginBottom: 12 }}>⚠️ Error en el Wizard</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 16, textAlign: 'center' }}>
+              {this.state.error?.message || 'Ocurrió un error inesperado'}
+            </p>
+            <button className="btn btn-primary" onClick={this.props.onClose}>Cerrar</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─���─ Main Wizard Component ──────────────────────────────────��────────────────
 export default function ModpackImportWizard({ onClose }) {
   const [currentStep, setCurrentStep] = useState('search');
   const [searchData, setSearchData] = useState(null);
@@ -638,6 +668,7 @@ export default function ModpackImportWizard({ onClose }) {
   };
 
   return (
+    <WizardErrorBoundary onClose={onClose}>
     <div className={`wizard-container ${currentStep === 'preview' ? 'wizard-container-compact' : ''}`}>
       <div className={`wizard-modal ${currentStep === 'preview' ? 'wizard-modal-compact' : ''}`}>
         {/* Content */}
@@ -691,5 +722,6 @@ export default function ModpackImportWizard({ onClose }) {
         )}
       </div>
     </div>
+    </WizardErrorBoundary>
   );
 }

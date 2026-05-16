@@ -88,7 +88,7 @@ export default function Sidebar() {
           >📥</button>
           <button
             id="btn-new-instance-sidebar"
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-xs"
             onClick={() => openModal('newInstance')}
           >+ Nueva</button>
         </div>

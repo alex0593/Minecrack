@@ -82,13 +82,13 @@ export default function Sidebar() {
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             id="btn-import-instance-sidebar"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-xs"
             onClick={() => setShowImportModal(true)}
             title="Importar instancia desde carpeta o ZIP"
           >📥</button>
           <button
             id="btn-new-instance-sidebar"
-            className="btn btn-primary"
+            className="btn btn-primary btn-sm"
             onClick={() => openModal('newInstance')}
           >+ Nueva</button>
         </div>

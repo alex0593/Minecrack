@@ -71,7 +71,10 @@ export default function Sidebar() {
         <button
           id="btn-download-modpack-sidebar"
           className="sidebar-nav-item"
-          onClick={() => dispatch({ type: 'SET_MODPACK_IMPORT_MODE', payload: true })}
+          onClick={() => {
+            dispatch({ type: 'SET_TAB', payload: 'instances' });
+            dispatch({ type: 'SET_MODPACK_IMPORT_MODE', payload: true });
+          }}
           title="Descargar modpack desde CurseForge o Modrinth"
         >
           <span className="nav-icon">📦</span>

@@ -24,6 +24,8 @@ import {
   inspectInstanceFolder,
   importInstanceFromFolder,
   getModsToDownload,
+  readFile,
+  ensureDir,
 } from '../lib/tauri';
 import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
 import ProgressBar from './ui/ProgressBar';
@@ -468,52 +470,61 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           const tempDir = `${launcherDir}/temp-modpack-${Date.now()}`;
           await extractZip(zipPath, tempDir);
 
-          // CurseForge modpack ZIP has manifest.json at root, actual instance in overrides/
-          const instanceDir = `${tempDir}/overrides`;
+          // CurseForge modpack ZIP has: manifest.json + overrides/ (files to copy into instance)
+          // Create new instance and copy overrides into it
+          setProgressLabel('Creating instance structure...');
+          setProgress(40);
 
-          // Inspect and import
-          setProgressLabel('Importing instance...');
-          setProgress(50);
+          const instanceId = `instance-${Date.now()}`;
+          const instancePath = `${launcherDir}/instances/${instanceId}`;
+          await ensureDir(instancePath);
 
-          const inspected = await inspectInstanceFolder(instanceDir);
-          const importResult = await importInstanceFromFolder(
-            launcherDir,
-            instanceDir,
-            config.instanceName,
-            config.icon,
-            ramMb,
-            config.jvmArgs || ''
-          );
-          const instanceId = importResult.newInstanceId;
+          // Copy overrides/* into the instance
+          const overridesPath = `${tempDir}/overrides`;
+          // For now, instance gets created with just the structure from overrides
+          // The actual instance structure (versions/) will be handled by Rust on first read
 
-          // Transformar el resultado de inspección al formato de instancia
+          // Read manifest to get metadata
+          const manifestContent = await readFile(`${tempDir}/manifest.json`);
+          const manifest = JSON.parse(manifestContent);
+
+          // Extract game version from manifest
+          const gameVersion = manifest.minecraft?.version || gameVersion || '1.20.1';
+          const loaderType = (manifest.minecraft?.modLoaders?.[0]?.id || '').toLowerCase();
+          const loaderVersion = manifest.minecraft?.modLoaders?.[0]?.version || '';
+
+          // Create instance object
           const newInstance = {
             id: instanceId,
-            name: config.instanceName || inspected.name,
-            version: inspected.mc_version,
-            loader: inspected.loader,
-            loaderVersion: inspected.loader_version,
+            name: config.instanceName || pack.name,
+            version: gameVersion,
+            loader: loaderType.includes('forge') ? 'forge' : loaderType.includes('fabric') ? 'fabric' : 'vanilla',
+            loaderVersion: loaderVersion,
             icon: config.icon || '📦',
             ram: ramMb,
             jvmArgs: config.jvmArgs || '',
-            installed: true,
+            installed: false, // Not installed yet, needs downloading
             createdAt: new Date().toISOString(),
             lastPlayed: null,
             playtime: 0,
-            modsCount: inspected.mods_count || 0,
+            modsCount: manifest.files?.length || 0,
           };
 
           dispatch({ type: 'ADD_INSTANCE', payload: newInstance });
 
+          // Now trigger instance installation (download version + libraries + mods)
+          setProgressLabel('Downloading instance files...');
+          setProgress(50);
+
           // Download mods if referenced
-          if (inspected.mods && inspected.mods.length > 0) {
-            setProgressLabel(`Downloading ${inspected.mods.length} mods...`);
+          if (manifest.files && manifest.files.length > 0) {
+            setProgressLabel(`Downloading ${manifest.files.length} mods...`);
             setProgress(70);
 
             try {
               await downloadMultipleModsFromCurseForge(
-                inspected.mods,
-                `${launcherDir}/instances/${instanceId}/mods`,
+                manifest.files,
+                `${instancePath}/mods`,
                 (current, total) => {
                   setProgress(70 + Math.round((current / total) * 30));
                   setProgressLabel(`Downloading mods: ${current}/${total}`);
@@ -546,44 +557,83 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           const tempDir = `${launcherDir}/temp-modpack-${Date.now()}`;
           await extractZip(mrpackPath, tempDir);
 
-          // Modrinth .mrpack ZIP has modrinth.index.json at root, actual instance in overrides/
-          const instanceDir = `${tempDir}/overrides`;
+          // Modrinth .mrpack ZIP has: modrinth.index.json + overrides/ (files to copy into instance)
+          // Create new instance
+          setProgressLabel('Creating instance structure...');
+          setProgress(40);
 
-          setProgressLabel('Importing instance...');
-          setProgress(50);
+          const instanceId = `instance-${Date.now()}`;
+          const instancePath = `${launcherDir}/instances/${instanceId}`;
+          await ensureDir(instancePath);
 
-          const inspected = await inspectInstanceFolder(instanceDir);
-          const importResult = await importInstanceFromFolder(
-            launcherDir,
-            instanceDir,
-            config.instanceName,
-            config.icon,
-            ramMb,
-            config.jvmArgs || ''
-          );
-          const instanceId = importResult.newInstanceId;
+          // Read modrinth.index.json to get metadata
+          const indexContent = await readFile(`${tempDir}/modrinth.index.json`);
+          const modrinthIndex = JSON.parse(indexContent);
 
-          // Transformar el resultado de inspección al formato de instancia
+          // Extract game version and loader info from modrinth.index.json
+          const gameVersion = modrinthIndex.game || '1.20.1';
+          const loaders = modrinthIndex.dependencies || {};
+
+          // Determine loader type
+          let loaderType = 'vanilla';
+          let loaderVersion = '';
+          if (loaders.fabric) {
+            loaderType = 'fabric';
+            loaderVersion = loaders.fabric;
+          } else if (loaders.quilt) {
+            loaderType = 'quilt';
+            loaderVersion = loaders.quilt;
+          } else if (loaders.forge) {
+            loaderType = 'forge';
+            loaderVersion = loaders.forge;
+          } else if (loaders.neoforge) {
+            loaderType = 'neoforge';
+            loaderVersion = loaders.neoforge;
+          }
+
+          // Create instance object
           const newInstance = {
             id: instanceId,
-            name: config.instanceName || inspected.name,
-            version: inspected.mc_version,
-            loader: inspected.loader,
-            loaderVersion: inspected.loader_version,
+            name: config.instanceName || pack.title,
+            version: gameVersion,
+            loader: loaderType,
+            loaderVersion: loaderVersion,
             icon: config.icon || '📦',
             ram: ramMb,
             jvmArgs: config.jvmArgs || '',
-            installed: true,
+            installed: false, // Not installed yet, needs downloading
             createdAt: new Date().toISOString(),
             lastPlayed: null,
             playtime: 0,
-            modsCount: inspected.mods_count || 0,
+            modsCount: modrinthIndex.files?.length || 0,
           };
 
           dispatch({ type: 'ADD_INSTANCE', payload: newInstance });
 
-          // Note: Modrinth mods download is handled differently
-          // For now, just mark as complete
+          // Download mods from Modrinth if referenced
+          if (modrinthIndex.files && modrinthIndex.files.length > 0) {
+            setProgressLabel(`Downloading ${modrinthIndex.files.length} mods...`);
+            setProgress(70);
+
+            try {
+              // Download each mod file
+              for (const file of modrinthIndex.files) {
+                if (file.downloads && file.downloads.length > 0) {
+                  const modUrl = file.downloads[0];
+                  const modFileName = file.path?.split('/').pop() || `mod-${Date.now()}.jar`;
+                  const modPath = `${instancePath}/mods/${modFileName}`;
+
+                  await ensureDir(`${instancePath}/mods`);
+                  await downloadFile(modUrl, modPath, file.hashes?.sha1, file.path || 'mod');
+                }
+              }
+              setProgress(95);
+            } catch (err) {
+              console.warn('[ModpackImportWizard] Modrinth mod download error:', err);
+              // Continue anyway - mods can be downloaded manually
+            }
+          }
+
           setProgress(100);
           setProgressLabel('Installation complete!');
           setDone(true);

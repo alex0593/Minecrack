@@ -12,6 +12,11 @@ import { validateJavaInstallation, autoRepairJava } from './java-repair';
 import { validateMinecraftJar, autoRepairMinecraftJar } from './minecraft-jar-repair';
 import { getLoaderInstallerPath } from './loader-repair';
 
+// ─── Java session cache (P1.3 optimization) ───────────────────────────────────
+// Memoize resolved Java path per major version for the duration of the session.
+// Re-scan only if unset or validation fails (double-validation in java-repair is intentional).
+const _javaCacheByVersion = {};
+
 function getLoaderProfileId(instance) {
   const { loader, loaderVersion, version } = instance;
   if (!loaderVersion || loader === 'vanilla') return null;
@@ -130,10 +135,19 @@ export async function launchGameInstance({ instance, profile, launcherDir, versi
     // FASE 1: Validar y reparar Java (crítico — no se puede lanzar sin él)
     // ─────────────────────────────────────────────────────────────────────────
     console.log(`[Launcher] FASE 1: Validación de Java...`);
-    const javaPaths = await tauriCmd('detect_java', { launcherDir });
     const prismJava = await getRequiredJavaVersion(instance.version).catch(() => null);
     const requiredMajor = prismJava ?? versionData?.javaVersion?.majorVersion ?? 17;
     console.log(`[Launcher] Java requerido: ${requiredMajor}`);
+
+    // ─── Session cache check (P1.3 optimization) ──────────────────────────────
+    // If we cached Java for this major version in this session, skip re-detection
+    let javaPaths = [];
+    if (_javaCacheByVersion[requiredMajor]) {
+      console.log(`[Launcher] ✓ Usando Java cacheado para v${requiredMajor}: ${_javaCacheByVersion[requiredMajor]}`);
+      javaPaths = [{ path: _javaCacheByVersion[requiredMajor], major_version: requiredMajor }];
+    } else {
+      javaPaths = await tauriCmd('detect_java', { launcherDir });
+    }
 
     // Filtrar Java adecuado por versión
     let suitable = requiredMajor === 8
@@ -222,6 +236,10 @@ export async function launchGameInstance({ instance, profile, launcherDir, versi
 
     const javaPath = suitable[0].path;
     console.log(`[Launcher] ✓ Java v${suitable[0].major_version} listo: ${javaPath}`);
+
+    // ─── Cache the resolved Java path (P1.3 optimization) ────────────────────
+    _javaCacheByVersion[requiredMajor] = javaPath;
+    console.log(`[Launcher] Cached Java v${requiredMajor} for session: ${javaPath}`);
 
     // ─────────────────────────────────────────────────────────────────────────
     // FASE 2: Validar Minecraft JAR (crítico para Forge/NeoForge)
@@ -354,19 +372,39 @@ export async function launchGameInstance({ instance, profile, launcherDir, versi
           versionData.mainClass = loaderProfile.mainClass;
         }
 
-        // Argumentos del juego: el perfil del loader tiene prioridad sobre vanilla.
-        // IMPORTANTE: Si el loader usa minecraftArguments (string legacy, Forge/ForgeWrapper),
-        // debemos ANULAR versionData.arguments (array moderno de vanilla) para que Rust
-        // no lo priorice y use en su lugar el minecraftArguments de Forge que incluye
-        // los parámetros --launchTarget, --fml.forgeVersion, etc.
+        // Argumentos del juego: fusionar los del loader con vanilla, no reemplazar.
+        // CRÍTICO: Mantener versionData.arguments (contiene --assetsDir, --assetIndex)
+        // Los args del loader (--launchTarget, --fml.forgeVersion) se AÑADEN al array.
         if (loaderProfile.minecraftArguments) {
-          versionData.minecraftArguments = loaderProfile.minecraftArguments;
-          versionData.arguments = null; // Forzar uso de minecraftArguments en Rust
-          console.log(`[Launcher] ✓ Usando minecraftArguments de ${instance.loader} (anuló arguments de vanilla)`);
+          // Loader usa formato legacy (string) - típico en Forge/ForgeWrapper
+          // Dividimos sus args y los añadimos al array moderno de vanilla
+          if (versionData.arguments && typeof versionData.arguments === 'object') {
+            const argsMap = versionData.arguments;
+            if (argsMap.game && Array.isArray(argsMap.game)) {
+              // Split loader's minecraftArguments y append al array de game args
+              const loaderTokens = loaderProfile.minecraftArguments.split(/\s+/).filter(t => t);
+              argsMap.game = [...argsMap.game, ...loaderTokens];
+              console.log(`[Launcher] ✓ Agregados ${loaderTokens.length} argumentos de ${instance.loader} al game arguments (preservando assets)`);
+            }
+          } else {
+            // Fallback: si no hay formato moderno, usar el legacy del loader
+            versionData.minecraftArguments = loaderProfile.minecraftArguments;
+            console.log(`[Launcher] ✓ Usando minecraftArguments de ${instance.loader} (fallback a legacy)`);
+          }
         } else if (loaderProfile.arguments) {
-          // Loader usa formato moderno (array) — reemplaza el de vanilla
-          versionData.arguments = loaderProfile.arguments;
-          console.log(`[Launcher] ✓ Usando arguments de ${instance.loader} (formato moderno)`);
+          // Loader usa formato moderno (array) — fusiona con vanilla
+          if (versionData.arguments && typeof versionData.arguments === 'object' &&
+              loaderProfile.arguments && typeof loaderProfile.arguments === 'object') {
+            // Merge ambos arrays de game args
+            const vanillaGameArgs = versionData.arguments.game || [];
+            const loaderGameArgs = loaderProfile.arguments.game || [];
+            versionData.arguments.game = [...vanillaGameArgs, ...loaderGameArgs];
+            console.log(`[Launcher] ✓ Fusionados arguments de ${instance.loader} (moderno + vanilla)`);
+          } else {
+            // Fallback: reemplazar enteros
+            versionData.arguments = loaderProfile.arguments;
+            console.log(`[Launcher] ✓ Usando arguments de ${instance.loader} (reemplazo)`);
+          }
         }
 
         // CRÍTICO: Agregar librerías del loader (ej: ForgeWrapper, securejarhandler, etc.)

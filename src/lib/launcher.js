@@ -448,6 +448,22 @@ export async function launchGameInstance({ instance, profile, launcherDir, versi
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // FASE 4.5: Limpiar fml.toml en primer lanzamiento (conflicto en importaciones)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (!instance.lastPlayed) {
+      const fmlTomlPath = `${launcherDir}/instances/${instance.id}/config/fml.toml`;
+      try {
+        const exists = await fileExists(fmlTomlPath);
+        if (exists) {
+          await tauriCmd('delete_file', { path: fmlTomlPath });
+          console.log(`[Launcher] ✓ Eliminado fml.toml conflictivo (primer lanzamiento de instancia importada)`);
+        }
+      } catch (err) {
+        console.warn('[Launcher] No se pudo eliminar fml.toml:', err.message);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // FASE 5: DELEGACIÓN A RUST
     // Toda la lógica pesada de preparación se ejecuta en Rust para mejor perf
     // ─────────────────────────────────────────────────────────────────────────

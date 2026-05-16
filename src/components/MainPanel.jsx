@@ -289,7 +289,7 @@ function ModsTab({ instance }) {
           </button>
           <button
             id="btn-export-mods"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost"
             onClick={handleExport}
             disabled={loading || exporting || mods.length === 0}
             title="Exportar mods como ZIP"
@@ -298,7 +298,7 @@ function ModsTab({ instance }) {
           </button>
           <button
             id="btn-import-mods"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost"
             onClick={() => setShowImportModal(true)}
             disabled={loading}
             title="Importar mods desde ZIP"

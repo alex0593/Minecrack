@@ -281,7 +281,7 @@ function ModsTab({ instance }) {
 
           <button
             id="btn-add-mod"
-            className="btn btn-primary"
+            className="btn btn-primary btn-sm"
             onClick={() => openModal('modBrowser', { instanceId: instance.id })}
             disabled={loading}
           >
@@ -289,7 +289,7 @@ function ModsTab({ instance }) {
           </button>
           <button
             id="btn-export-mods"
-            className="btn btn-ghost"
+            className="btn btn-ghost btn-sm"
             onClick={handleExport}
             disabled={loading || exporting || mods.length === 0}
             title="Exportar mods como ZIP"
@@ -298,7 +298,7 @@ function ModsTab({ instance }) {
           </button>
           <button
             id="btn-import-mods"
-            className="btn btn-ghost"
+            className="btn btn-ghost btn-sm"
             onClick={() => setShowImportModal(true)}
             disabled={loading}
             title="Importar mods desde ZIP"

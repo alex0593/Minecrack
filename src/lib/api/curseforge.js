@@ -36,7 +36,7 @@ export async function searchMods(query, options = {}) {
       params.append('modLoaderType', mapLoaderToCF(loader));
     }
 
-    const url = `${API.CURSEFORGE.search()}&${params.toString()}`;
+    const url = `${API.CURSEFORGE.search()}?${params.toString()}`;
     console.log(`${LOG_PREFIX} searchMods("${query}")`, { gameVersion, loader });
 
     const response = await fetch(url, {
@@ -254,6 +254,7 @@ export async function searchResourcePacks(query, options = {}) {
 
   try {
     const params = new URLSearchParams({
+      gameId: '432', // Minecraft
       classId: '12', // Resource Packs
       searchFilter: query,
       pageSize: limit,
@@ -265,7 +266,7 @@ export async function searchResourcePacks(query, options = {}) {
       params.append('gameVersion', gameVersion);
     }
 
-    const url = `${API.CURSEFORGE.search()}${params.toString()}`;
+    const url = `${API.CURSEFORGE.search()}?${params.toString()}`;
     console.log(`${LOG_PREFIX} searchResourcePacks("${query}")`, { gameVersion });
 
     const response = await fetch(url, {
@@ -304,6 +305,7 @@ export async function searchShaderpacks(query, options = {}) {
 
   try {
     const params = new URLSearchParams({
+      gameId: '432', // Minecraft
       classId: '6552', // Shaders
       searchFilter: query,
       pageSize: limit,
@@ -315,7 +317,7 @@ export async function searchShaderpacks(query, options = {}) {
       params.append('gameVersion', gameVersion);
     }
 
-    const url = `${API.CURSEFORGE.search()}${params.toString()}`;
+    const url = `${API.CURSEFORGE.search()}?${params.toString()}`;
     console.log(`${LOG_PREFIX} searchShaderpacks("${query}")`, { gameVersion });
 
     const response = await fetch(url, {
@@ -354,7 +356,8 @@ export async function searchModpacks(query, options = {}) {
 
   try {
     const params = new URLSearchParams({
-      classId: '17', // Modpacks
+      gameId: '432', // Minecraft
+      classId: '4471', // Modpacks
       searchFilter: query,
       pageSize: limit,
       index: offset,
@@ -365,7 +368,7 @@ export async function searchModpacks(query, options = {}) {
       params.append('gameVersion', gameVersion);
     }
 
-    const url = `${API.CURSEFORGE.search()}${params.toString()}`;
+    const url = `${API.CURSEFORGE.search()}?${params.toString()}`;
     console.log(`${LOG_PREFIX} searchModpacks("${query}")`, { gameVersion });
 
     const response = await fetch(url, {

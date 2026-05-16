@@ -111,8 +111,10 @@ export const API = {
     BASE:    import.meta.env.VITE_CURSEFORGE_API_BASE,
     API_KEY: import.meta.env.VITE_CURSEFORGE_API_KEY || null,
 
-    search:   (params = '') =>
-      `${import.meta.env.VITE_CURSEFORGE_API_BASE}/mods/search?gameId=432&${params}`,
+    // Endpoint base de búsqueda. El caller construye el query string completo
+    // (un único URLSearchParams con gameId incluido) y lo añade con `?`.
+    search:   () =>
+      `${import.meta.env.VITE_CURSEFORGE_API_BASE}/mods/search`,
     mod:      (id) =>
       `${import.meta.env.VITE_CURSEFORGE_API_BASE}/mods/${id}`,
     files:    (modId) =>

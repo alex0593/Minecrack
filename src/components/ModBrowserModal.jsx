@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useStore } from '../store';
+import { useStoreState, useDispatch } from '../store';
 import { searchMods, searchModpacks, getProjectVersions, getProject, getVersion, createModrinthFetcher } from '../lib/api/modrinth';
 import { searchMods as searchModsCF, searchModpacks as searchModpacksCF, isCurseForgeConfigured } from '../lib/api/curseforge';
 import { normalizeModrinthVersion } from '../lib/mods/metadata';
@@ -54,7 +54,8 @@ function ModDetail({ mod, instance, onInstalled, isModpack, filterSource }) {
   const [plan,          setPlan]          = useState(null);  // ResolutionPlan
   const [installing,    setInstalling]    = useState(false);
   const [progress,      setProgress]      = useState(null);
-  const { dispatch, state }               = useStore();
+  const { dispatch }    = useDispatch();
+  const state           = useStoreState();
 
   // Mods ya instalados en la instancia actual
   const installedIds = (state.instanceMods ?? []).map(m => m.id ?? m.filename);
@@ -295,14 +296,14 @@ function ModDetail({ mod, instance, onInstalled, isModpack, filterSource }) {
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
 export default function ModBrowserModal({ instanceId, onClose }) {
-  const { state } = useStore();
-  const instance  = state.instances.find(i => i.id === instanceId);
+  const state    = useStoreState();
+  const instance = state.instances.find(i => i.id === instanceId);
 
   // Guard: Vanilla no soporta mods
   if (instance?.loader === 'vanilla') {
     return (
       <div className="modbrowser-overlay" onClick={onClose}>
-        <div className="modbrowser-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, minHeight: 'auto' }}>
+        <div className="modbrowser-modal modal modal--sm" onClick={e => e.stopPropagation()} style={{ minHeight: 'auto' }}>
           <div className="modbrowser-header">
             <h2>📦 Explorar Mods</h2>
             <button className="modal-close" onClick={onClose}>✕</button>
@@ -331,6 +332,7 @@ export default function ModBrowserModal({ instanceId, onClose }) {
   const [total,    setTotal]    = useState(0);
   const [offset,   setOffset]   = useState(0);
   const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState(null);
   const [selected, setSelected] = useState(null);
   const [filterSource, setFilterSource] = useState('modrinth');
   const [filterType, setFilterType] = useState('mods'); // 'mods' | 'modpacks'
@@ -345,6 +347,14 @@ export default function ModBrowserModal({ instanceId, onClose }) {
 
   const doSearch = useCallback(async (q, version, loader, source, type, off = 0) => {
     setLoading(true);
+    setError(null);
+    // Aviso temprano si CurseForge está seleccionado pero no configurado
+    if (source === 'curseforge' && !isCurseForgeConfigured()) {
+      setResults([]);
+      setLoading(false);
+      setError('La API de CurseForge no está configurada. Añade una API key válida en VITE_CURSEFORGE_API_KEY (.env) y reinicia la app.');
+      return;
+    }
     try {
       let data;
       if (source === 'modrinth') {
@@ -365,9 +375,9 @@ export default function ModBrowserModal({ instanceId, onClose }) {
             offset: off,
           });
         }
-        if (off === 0) setResults(data.hits);
-        else setResults(prev => [...prev, ...data.hits]);
-        setTotal(data.total_hits);
+        if (off === 0) setResults(data?.hits || []);
+        else setResults(prev => [...prev, ...(data?.hits || [])]);
+        setTotal(data?.total_hits || 0);
       } else if (source === 'curseforge') {
         if (type === 'mods') {
           data = await searchModsCF(q, {
@@ -383,13 +393,16 @@ export default function ModBrowserModal({ instanceId, onClose }) {
             offset: off,
           });
         }
-        if (off === 0) setResults(data.data);
-        else setResults(prev => [...prev, ...data.data]);
-        setTotal(data.pagination.totalCount);
+        if (off === 0) setResults(data?.data || []);
+        else setResults(prev => [...prev, ...(data?.data || [])]);
+        setTotal(data?.pagination?.totalCount || 0);
       }
       setOffset(off);
     } catch (err) {
       console.error('[ModBrowser] Error buscando:', err);
+      if (off === 0) setResults([]);
+      const srcName = source === 'curseforge' ? 'CurseForge' : 'Modrinth';
+      setError(`Error al cargar desde ${srcName}: ${err?.message || err}. Revisa tu conexión y, si usas CurseForge, que la API key sea válida.`);
     } finally {
       setLoading(false);
     }
@@ -411,7 +424,7 @@ export default function ModBrowserModal({ instanceId, onClose }) {
 
   return (
     <div className="modbrowser-overlay" onClick={onClose}>
-      <div className="modbrowser-modal" onClick={e => e.stopPropagation()}>
+      <div className="modbrowser-modal modal modal--xl" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="modbrowser-header">
@@ -474,6 +487,10 @@ export default function ModBrowserModal({ instanceId, onClose }) {
           <div className="modbrowser-list">
             {loading && results.length === 0 ? (
               <div className="modbrowser-loading">Buscando...</div>
+            ) : error ? (
+              <div className="modbrowser-loading" style={{ color: 'var(--red)', textAlign: 'center', padding: '24px 16px', lineHeight: 1.5 }}>
+                ⚠️ {error}
+              </div>
             ) : results.length === 0 ? (
               <div className="modbrowser-loading">No se encontraron mods</div>
             ) : (

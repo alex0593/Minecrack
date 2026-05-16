@@ -21,7 +21,7 @@ export async function searchModpacks(query, options = {}) {
   try {
     const params = new URLSearchParams({
       gameId: '432', // Minecraft
-      classId: '4472', // 4472 = Modpack
+      classId: '4471', // 4471 = Modpacks (classId correcto de CurseForge)
       searchFilter: query,
       pageSize: limit,
       index: offset,
@@ -32,7 +32,7 @@ export async function searchModpacks(query, options = {}) {
       params.append('gameVersion', gameVersion);
     }
 
-    const url = `${API.CURSEFORGE.search()}&${params.toString()}`;
+    const url = `${API.CURSEFORGE.search()}?${params.toString()}`;
     console.log(`${LOG_PREFIX} searchModpacks("${query}")`, { gameVersion });
 
     const response = await fetch(url, {

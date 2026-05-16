@@ -468,14 +468,17 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           const tempDir = `${launcherDir}/temp-modpack-${Date.now()}`;
           await extractZip(zipPath, tempDir);
 
+          // CurseForge modpack ZIP has manifest.json at root, actual instance in overrides/
+          const instanceDir = `${tempDir}/overrides`;
+
           // Inspect and import
           setProgressLabel('Importing instance...');
           setProgress(50);
 
-          const inspected = await inspectInstanceFolder(tempDir);
+          const inspected = await inspectInstanceFolder(instanceDir);
           const importResult = await importInstanceFromFolder(
             launcherDir,
-            tempDir,
+            instanceDir,
             config.instanceName,
             config.icon,
             ramMb,
@@ -543,13 +546,16 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           const tempDir = `${launcherDir}/temp-modpack-${Date.now()}`;
           await extractZip(mrpackPath, tempDir);
 
+          // Modrinth .mrpack ZIP has modrinth.index.json at root, actual instance in overrides/
+          const instanceDir = `${tempDir}/overrides`;
+
           setProgressLabel('Importing instance...');
           setProgress(50);
 
-          const inspected = await inspectInstanceFolder(tempDir);
+          const inspected = await inspectInstanceFolder(instanceDir);
           const importResult = await importInstanceFromFolder(
             launcherDir,
-            tempDir,
+            instanceDir,
             config.instanceName,
             config.icon,
             ramMb,

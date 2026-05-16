@@ -243,15 +243,20 @@ function Step2Preview({ source, pack, gameVersion, onNext, onBack }) {
         setLoading(true);
         let data;
         if (source === 'modrinth') {
-          data = await (await fetch(
-            `https://api.modrinth.com/v2/project/${pack.project_id}/versions`
-          )).json();
-          setVersions(data || []);
-          if (data?.length > 0) setSelectedVersion(data[0]);
+          const res = await fetch(
+            `https://api.modrinth.com/v2/project/${pack.project_id}/version`
+          );
+          if (!res.ok) throw new Error(`Modrinth API error: ${res.status}`);
+          data = await res.json();
+          const versionsList = Array.isArray(data) ? data : [];
+          setVersions(versionsList);
+          if (versionsList.length > 0) setSelectedVersion(versionsList[0]);
         } else {
           const result = await getCFModpackWithVersions(pack.id, gameVersion);
-          setVersions(result.versions || []);
+          const versionsList = Array.isArray(result.versions) ? result.versions : [];
+          setVersions(versionsList);
           if (result.bestVersion) setSelectedVersion(result.bestVersion);
+          else if (versionsList.length > 0) setSelectedVersion(versionsList[0]);
         }
       } catch (err) {
         setError(err?.message || 'Error loading versions');

@@ -109,15 +109,29 @@ async fn copy_file(src: String, dest: String) -> Result<(), String> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMANDO: Verifica si un archivo existe y opcionalmente comprueba su SHA1
+// P1.4 optimization: SHA1 computation wrapped in spawn_blocking to avoid blocking async runtime
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
 async fn file_exists(path: String, expected_sha1: Option<String>) -> bool {
     let p = PathBuf::from(&path);
     if !p.exists() { return false; }
     if let Some(expected) = expected_sha1 {
-        let Ok(data) = std::fs::read(&p) else { return false; };
-        let hash = format!("{:x}", Sha1::digest(&data));
-        return hash == expected.to_lowercase();
+        // Clone path for the blocking task
+        let path_clone = p.clone();
+        let expected_lower = expected.to_lowercase();
+
+        // Wrap SHA1 computation in spawn_blocking to avoid blocking async runtime
+        let result = tokio::task::spawn_blocking(move || {
+            match std::fs::read(&path_clone) {
+                Ok(data) => {
+                    let hash = format!("{:x}", Sha1::digest(&data));
+                    hash == expected_lower
+                }
+                Err(_) => false,
+            }
+        }).await;
+
+        return result.unwrap_or(false);
     }
     true
 }
@@ -1085,7 +1099,7 @@ fn build_game_arguments(
             .replace("${version_name}", game_version)
             .replace("${game_directory}", game_dir)
             .replace("${assets_root}", assets_dir)
-            .replace("${assets_index_name}", &format!("{}", game_version))
+            .replace("${assets_index_name}", version_data.assets_index_name.as_deref().unwrap_or(game_version))
             .replace("${auth_uuid}", player_uuid)
             .replace("${auth_access_token}", "0")
             .replace("${user_properties}", "{}")

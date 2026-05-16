@@ -372,19 +372,16 @@ export async function launchGameInstance({ instance, profile, launcherDir, versi
           versionData.mainClass = loaderProfile.mainClass;
         }
 
-        // Argumentos del juego: el loader proporciona args complementarias (--launchTarget, --fml.*)
-        // IMPORTANTE: NO anular versionData.arguments (Rust lo usa para assets)
-        // Proporcionar minecraftArguments del loader también, pero Rust prioriza arguments
+        // Argumentos del juego: Forge usa minecraftArguments (string legacy completa)
+        // que incluye TANTO los asset args (--assetsDir, --assetIndex) como los
+        // Forge-specific args (--launchTarget, --fml.forgeVersion, etc.)
+        // Debemos anular versionData.arguments para que Rust use minecraftArguments.
         if (loaderProfile.minecraftArguments) {
-          // Loader usa formato legacy (string) — Forge/ForgeWrapper con args completas
-          // Guardamos pero no reemplazamos arguments (Rust las usará si existen)
           versionData.minecraftArguments = loaderProfile.minecraftArguments;
-          console.log(`[Launcher] ✓ minecraftArguments de ${instance.loader} disponible (Rust usará arguments si existen)`);
-        }
-
-        if (loaderProfile.arguments) {
+          versionData.arguments = null; // Forzar Rust a usar minecraftArguments
+          console.log(`[Launcher] ✓ Usando minecraftArguments de ${instance.loader} (formato legacy completo con assets + fml args)`);
+        } else if (loaderProfile.arguments) {
           // Loader usa formato moderno (array) — NeoForge u otro loader moderno
-          // Reemplazar arguments completamente (el loader proporciona un conjunto completo)
           versionData.arguments = loaderProfile.arguments;
           console.log(`[Launcher] ✓ Usando arguments de ${instance.loader} (formato moderno)`);
         }

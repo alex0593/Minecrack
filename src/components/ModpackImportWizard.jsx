@@ -445,6 +445,11 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
 
         const launcherDir = await getLauncherDir();
 
+        // Parse RAM: convert string like "4GB" to number (MB), or use raw number
+        const ramMb = typeof config.ram === 'string'
+          ? parseInt(config.ram) * (config.ram.toLowerCase().includes('gb') ? 1024 : 1)
+          : (config.ram || 2048);
+
         // Determine download URL and extract logic based on source
         if (source === 'curseforge') {
           // CurseForge: download ZIP
@@ -454,9 +459,7 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           const url = await getModpackDownloadUrl(pack.id, version.id);
           const zipPath = `${launcherDir}/modpacks/${pack.slug || pack.name.replace(/\s+/g, '-')}-${Date.now()}.zip`;
 
-          await downloadFile(url, zipPath, (p) => {
-            setProgress(10 + Math.round((p.done / p.total) * 20));
-          });
+          await downloadFile(url, zipPath, null, pack.name || 'modpack');
 
           // Extract
           setProgressLabel('Extracting files...');
@@ -475,8 +478,8 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
             tempDir,
             config.instanceName,
             config.icon,
-            config.ram,
-            config.jvmArgs
+            ramMb,
+            config.jvmArgs || ''
           );
           const instanceId = importResult.newInstanceId;
 
@@ -488,7 +491,7 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
             loader: inspected.loader,
             loaderVersion: inspected.loader_version,
             icon: config.icon || '📦',
-            ram: config.ram ? parseInt(config.ram) : 2048,
+            ram: ramMb,
             jvmArgs: config.jvmArgs || '',
             installed: true,
             createdAt: new Date().toISOString(),
@@ -532,7 +535,7 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           if (!downloadUrl) throw new Error('No download URL found in Modrinth version');
 
           const mrpackPath = `${launcherDir}/modpacks/${pack.slug || pack.title.replace(/\s+/g, '-')}-${Date.now()}.mrpack`;
-          await downloadFile(downloadUrl, mrpackPath);
+          await downloadFile(downloadUrl, mrpackPath, null, pack.title || 'modpack');
 
           setProgressLabel('Extracting files...');
           setProgress(30);
@@ -549,8 +552,8 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
             tempDir,
             config.instanceName,
             config.icon,
-            config.ram,
-            config.jvmArgs
+            ramMb,
+            config.jvmArgs || ''
           );
           const instanceId = importResult.newInstanceId;
 
@@ -562,7 +565,7 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
             loader: inspected.loader,
             loaderVersion: inspected.loader_version,
             icon: config.icon || '📦',
-            ram: config.ram ? parseInt(config.ram) : 2048,
+            ram: ramMb,
             jvmArgs: config.jvmArgs || '',
             installed: true,
             createdAt: new Date().toISOString(),

@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, Component } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useStore } from '../store';
 import { searchModpacks as searchModrinthPacks } from '../lib/api/modrinth';
 import {
@@ -475,7 +476,7 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           setProgressLabel('Creating instance structure...');
           setProgress(40);
 
-          const instanceId = `instance-${Date.now()}`;
+          const instanceId = uuidv4();
           const instancePath = `${launcherDir}/instances/${instanceId}`;
           await ensureDir(instancePath);
 
@@ -562,7 +563,7 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           setProgressLabel('Creating instance structure...');
           setProgress(40);
 
-          const instanceId = `instance-${Date.now()}`;
+          const instanceId = uuidv4();
           const instancePath = `${launcherDir}/instances/${instanceId}`;
           await ensureDir(instancePath);
 

@@ -39,6 +39,18 @@ export async function getNeoForgeVersions(gameVersion) {
   }
 }
 
+// Convierte "group:artifact:version[:classifier]" al path Maven relativo
+function nameToMavenPath(name) {
+  const parts = name.split(':');
+  if (parts.length < 3) return null;
+  const [group, artifact, version, classifier] = parts;
+  const groupPath = group.replace(/\./g, '/');
+  if (classifier) {
+    return `${groupPath}/${artifact}/${version}/${artifact}-${version}-${classifier}.jar`;
+  }
+  return `${groupPath}/${artifact}/${version}/${artifact}-${version}.jar`;
+}
+
 /**
  * Genera el JSON de perfil NeoForge usando los datos de Prism Meta.
  * Si Prism no tiene el perfil, genera uno básico de fallback.
@@ -55,12 +67,49 @@ export function generateNeoForgeProfile(versionData, neoforgeVersion, gameVersio
 
   // ── Con datos de Prism Meta (camino correcto) ─────────────────────────────
   if (prismData?.libraries?.length > 0) {
-    const libraries = prismData.libraries
-      .filter(lib => lib.downloads?.artifact?.url && lib.downloads?.artifact?.path);
+    // Prism Meta a veces omite "path" en downloads.artifact. Derivarlo del name si falta.
+    const normalizeArtifact = (entry) => {
+      const a = entry.downloads?.artifact;
+      if (!a?.url) return null;
+      if (!a.path && entry.name) {
+        const derived = nameToMavenPath(entry.name);
+        if (derived) return { ...entry, downloads: { ...entry.downloads, artifact: { ...a, path: derived } } };
+      }
+      return a.path ? entry : null;
+    };
+
+    const libraries = prismData.libraries.map(normalizeArtifact).filter(Boolean);
 
     const mainClass = prismData.mainClass ?? 'cpw.mods.bootstraplauncher.BootstrapLauncher';
 
+    // mavenFiles: archivos que ForgeWrapper necesita para instalar NeoForge en el primer arranque.
+    // NeoForge 1.20.1 (47.x) usa ForgeWrapper igual que Forge — sin estos archivos no arranca.
+    let mavenFiles = (prismData.mavenFiles ?? []).map(normalizeArtifact).filter(Boolean);
+
+    // Si el mainClass es ForgeWrapper, asegurar que el installer JAR está en mavenFiles
+    const isForgeWrapper = mainClass?.includes('forgewrapper') || mainClass?.includes('ForgeWrapper');
+    if (isForgeWrapper) {
+      const installerEntry = {
+        name: `net.neoforged:neoforge:${neoforgeVersion}:installer`,
+        downloads: {
+          artifact: {
+            path: `net/neoforged/neoforge/${neoforgeVersion}/neoforge-${neoforgeVersion}-installer.jar`,
+            url: `${API.NEOFORGE.MAVEN_BASE}/net/neoforged/neoforge/${neoforgeVersion}/neoforge-${neoforgeVersion}-installer.jar`,
+            sha1: null,
+            size: 0,
+          },
+        },
+      };
+      const installerExists = mavenFiles.some(mf => mf.downloads?.artifact?.path?.includes('installer'));
+      if (!installerExists) {
+        mavenFiles = [...mavenFiles, installerEntry];
+      }
+    }
+
     const profile = {
+      // formatVersion 2 = perfil generado con el flujo nuevo. Perfiles sin este campo
+      // se detectan como legacy y se regeneran en cada lanzamiento (bucle de reparación).
+      formatVersion: 2,
       id: profileId,
       inheritsFrom: gameVersion,
       releaseTime: prismData.releaseTime ?? versionData.releaseTime,
@@ -70,15 +119,17 @@ export function generateNeoForgeProfile(versionData, neoforgeVersion, gameVersio
       arguments: prismData.arguments ?? versionData.arguments,
       minecraftArguments: prismData.minecraftArguments ?? null,
       libraries,
+      mavenFiles,
     };
 
-    console.log(`[NeoForge] Perfil con Prism: mainClass=${mainClass}, ${libraries.length} libraries`);
+    console.log(`[NeoForge] Perfil con Prism: mainClass=${mainClass}, ${libraries.length} libraries, ${mavenFiles.length} mavenFiles`);
     return profile;
   }
 
   // ── Fallback: perfil básico ───────────────────────────────────────────────
   console.warn(`[NeoForge] Sin datos de Prism — perfil básico para ${neoforgeVersion}`);
   return {
+    formatVersion: 2,
     id: profileId,
     inheritsFrom: gameVersion,
     releaseTime: versionData.releaseTime,
@@ -113,17 +164,26 @@ export function getNeoForgeDownloadTasks(neoforgeVersion, launcherDir, neoProfil
   const tasks = [];
   const librariesDir = `${launcherDir}/libraries`;
 
-  for (const lib of neoProfile.libraries ?? []) {
-    const artifact = lib.downloads?.artifact;
-    if (!artifact?.url || !artifact?.path) continue;
-
+  const pushTask = (entry, kind) => {
+    const artifact = entry.downloads?.artifact;
+    if (!artifact?.url || !artifact?.path) return;
     tasks.push({
       url:     artifact.url,
       dest:    `${librariesDir}/${artifact.path}`,
       sha1:    artifact.sha1 ?? null,
-      label:   lib.name ?? artifact.path.split('/').pop(),
+      label:   `${kind === 'maven' ? '[maven] ' : ''}${entry.name ?? artifact.path.split('/').pop()}`,
       libPath: artifact.path,
     });
+  };
+
+  // Libraries del perfil — van al classpath (incluye ForgeWrapper si aplica)
+  for (const lib of neoProfile.libraries ?? []) {
+    pushTask(lib, 'lib');
+  }
+
+  // mavenFiles — auxiliares de ForgeWrapper (installer JAR, mcp_config, etc.), NO van al classpath
+  for (const mf of neoProfile.mavenFiles ?? []) {
+    pushTask(mf, 'maven');
   }
 
   return tasks;
@@ -191,7 +251,7 @@ export async function installNeoForge(gameVersion, loaderVersion, launcherDir, v
     console.log(`[NeoForge] Instalación completada — ${downloadTasks.length} archivos a descargar`);
 
     return {
-      loaderVersion: selectedVersion,
+      loaderVersion: profileId,
       profile: neoProfile,
       downloadTasks,
     };

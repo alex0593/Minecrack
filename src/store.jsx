@@ -19,6 +19,7 @@ const initialState = {
   activeTab: 'instances',   // 'instances' | 'mods' | 'settings'
   modal: null,              // null | 'newInstance' | 'profile' | 'modBrowser' | 'instanceSettings'
   modalData: null,
+  modpackImportMode: false, // true cuando se está importando un modpack
 
   // Descarga activa
   download: null,           // null | { label, progress, total }
@@ -93,6 +94,9 @@ function reducer(state, action) {
 
     case 'CLOSE_MODAL':
       return { ...state, modal: null, modalData: null };
+
+    case 'SET_MODPACK_IMPORT_MODE':
+      return { ...state, modpackImportMode: action.payload };
 
     case 'SET_DOWNLOAD':
       return { ...state, download: action.payload };

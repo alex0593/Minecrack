@@ -162,6 +162,7 @@ export default function NewInstanceModal() {
                 placeholder="Mi Instancia de Fabric"
                 autoFocus
                 maxLength={40}
+                autoComplete="off"
               />
             </div>
 

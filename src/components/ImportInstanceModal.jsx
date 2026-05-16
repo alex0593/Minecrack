@@ -372,6 +372,7 @@ export default function ImportInstanceModal({ onClose }) {
               onChange={e => setNewName(e.target.value)}
               placeholder="Nombre..."
               autoFocus
+              autoComplete="off"
             />
           </div>
 

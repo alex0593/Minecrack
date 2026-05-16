@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../store';
 import { searchShaderpacks as searchModrinthShaders, getProjectVersions } from '../lib/api/modrinth';
 import { searchShaderpacks as searchCFShaders, getModFiles } from '../lib/api/curseforge';
-import { downloadMod, getLauncherDir, listShaderPacks, tauriListen } from '../lib/tauri';
+import { downloadShaderPack, getLauncherDir, listShaderPacks, tauriListen } from '../lib/tauri';
 import { getFile as getCFFile, extractSha1 } from '../lib/api/curseforge';
 import Select from './ui/Select';
 import './PackBrowserModal.css';
@@ -80,9 +80,9 @@ function ShaderDetail({ shader, instance, source, onInstalled }) {
         sha1 = extractSha1(fileInfo);
       }
 
-      // Descargar el shader
+      // Descargar el shader directamente a la carpeta shaderpacks/
       setProgress({ label: `Descargando ${fileName}`, percent: 0 });
-      await downloadMod(
+      await downloadShaderPack(
         launcherDir,
         instance.id,
         downloadUrl,

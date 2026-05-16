@@ -11,10 +11,16 @@ import { formatPlaytime, formatRelativeTime, formatLogTime } from '../lib/format
 import ImportModsModal from './ImportModsModal';
 import ExportInstanceModal from './ExportInstanceModal';
 import SettingsPage from './SettingsPage';
+import ModpackImportWizard from './ModpackImportWizard';
 
 /* ─── Helpers ─────────────────────────────────── */
 const fmtModVersion = (v) =>
   !v || v === 'unknown' || v === 'N/A' || v.includes('${') ? null : v;
+
+const fmtModName = (name, version) => {
+  const ver = fmtModVersion(version);
+  return ver ? `${name} v${ver}` : name;
+};
 
 const loaderBadge = (loader) => {
   const l = LOADERS.find(x => x.id === loader);
@@ -163,9 +169,7 @@ function ModsTab({ instance }) {
   const [loading, setLoading] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [expandedMod, setExpandedMod] = useState(null); // filename del mod expandido
-
-  // Sub-tabs: 'mods' | 'resourcepacks' | 'shaderpacks'
-  const [subTab, setSubTab] = useState('mods');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // View mode: 'grid' | 'list' | 'compact' — persisted in localStorage
   const [viewMode, setViewMode] = useState(() => {
@@ -181,6 +185,16 @@ function ModsTab({ instance }) {
     setViewMode(mode);
     try { localStorage.setItem('minecrack.modsViewMode', mode); } catch {}
   };
+
+  // Filtrar mods por búsqueda
+  const q = searchQuery.trim().toLowerCase();
+  const filteredMods = q
+    ? mods.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        m.filename.toLowerCase().includes(q) ||
+        (m.description || '').toLowerCase().includes(q)
+      )
+    : mods;
 
   const handleDelete = async (filename) => {
     try {
@@ -237,29 +251,14 @@ function ModsTab({ instance }) {
 
   return (
     <div>
-      {/* Sub-tabs */}
-      <div className="mods-subtabs">
-        {[
-          { id: 'mods',         label: `🧩 Mods (${mods.length})` },
-          { id: 'resourcepacks', label: '🎨 Resource Packs' },
-          { id: 'shaderpacks',   label: '✨ Shaders' },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            className={`mods-subtab${subTab === tab.id ? ' active' : ''}`}
-            onClick={() => setSubTab(tab.id)}
-          >{tab.label}</button>
-        ))}
-      </div>
-
-      {/* Resource Packs tab */}
-      {subTab === 'resourcepacks' && <PacksTab instance={instance} type="resourcepacks" />}
-      {subTab === 'shaderpacks'   && <PacksTab instance={instance} type="shaderpacks"   />}
-
-      {/* Mods tab */}
-      {subTab === 'mods' && <div>
       <div className="mods-header">
-        <h3>Mods instalados ({mods.length})</h3>
+        <h3>
+          Mods instalados
+          {' '}
+          <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
+            ({q ? `${filteredMods.length}/${mods.length}` : mods.length})
+          </span>
+        </h3>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* View mode toggle */}
           <div className="mods-view-toggle">
@@ -282,7 +281,7 @@ function ModsTab({ instance }) {
 
           <button
             id="btn-add-mod"
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-xs"
             onClick={() => openModal('modBrowser', { instanceId: instance.id })}
             disabled={loading}
           >
@@ -290,7 +289,7 @@ function ModsTab({ instance }) {
           </button>
           <button
             id="btn-export-mods"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-xs"
             onClick={handleExport}
             disabled={loading || exporting || mods.length === 0}
             title="Exportar mods como ZIP"
@@ -299,7 +298,7 @@ function ModsTab({ instance }) {
           </button>
           <button
             id="btn-import-mods"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-xs"
             onClick={() => setShowImportModal(true)}
             disabled={loading}
             title="Importar mods desde ZIP"
@@ -327,6 +326,26 @@ function ModsTab({ instance }) {
             loadMods();
           }}
         />
+      )}
+
+      {/* Barra de búsqueda */}
+      {mods.length > 0 && (
+        <div className="mods-search-bar">
+          <input
+            type="search"
+            className="mods-search-input"
+            placeholder="🔍 Buscar mod..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              className="mods-search-clear"
+              onClick={() => setSearchQuery('')}
+              title="Limpiar búsqueda"
+            >✕</button>
+          )}
+        </div>
       )}
 
       {/* Export success notification */}
@@ -362,13 +381,21 @@ function ModsTab({ instance }) {
             >📥 Importar ZIP</button>
           </div>
         </div>
+      ) : filteredMods.length === 0 ? (
+        <div className="empty-state" style={{ padding: '24px 0' }}>
+          <div className="empty-state-illustration" style={{ fontSize: 32 }}>🔍</div>
+          <h3 className="empty-state-title" style={{ fontSize: 15 }}>Sin resultados para "{searchQuery}"</h3>
+          <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => setSearchQuery('')}>
+            Limpiar búsqueda
+          </button>
+        </div>
       ) : (
         <div className={
           viewMode === 'grid'    ? 'mods-grid'
           : viewMode === 'list'  ? 'mods-list'
           : 'mods-compact'
         }>
-          {mods.map(mod => {
+          {filteredMods.map(mod => {
             const isExpanded = expandedMod === mod.filename;
 
             if (viewMode === 'compact') {
@@ -379,14 +406,16 @@ function ModsTab({ instance }) {
                     onClick={() => setExpandedMod(isExpanded ? null : mod.filename)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <span className={`mod-compact-dot${!mod.enabled ? ' off' : ''}`} />
-                    <span className="mod-compact-name">{mod.name}</span>
-                    {fmtModVersion(mod.version) && <span className="mod-compact-version">{fmtModVersion(mod.version)}</span>}
+                    {mod.iconBase64
+                      ? <img src={mod.iconBase64} alt="" className="mod-compact-icon" />
+                      : <span className={`mod-compact-dot${!mod.enabled ? ' off' : ''}`} />
+                    }
+                    <span className="mod-compact-name">{fmtModName(mod.name, mod.version)}</span>
                     <div className="mod-compact-actions" onClick={e => e.stopPropagation()}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => handleToggle(mod.filename, mod.enabled)}>
+                      <button className="btn btn-ghost btn-xs" onClick={() => handleToggle(mod.filename, mod.enabled)}>
                         {mod.enabled ? '🔒' : '🔓'}
                       </button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(mod.filename)}>✕</button>
+                      <button className="btn btn-danger btn-xs" onClick={() => handleDelete(mod.filename)}>✕</button>
                     </div>
                   </div>
                   {isExpanded && mod.description && (
@@ -407,16 +436,20 @@ function ModsTab({ instance }) {
                     onClick={() => setExpandedMod(isExpanded ? null : mod.filename)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <div className="mod-row-icon">{mod.enabled ? '🧩' : '⊘'}</div>
+                    <div className="mod-row-icon">
+                      {mod.iconBase64
+                        ? <img src={mod.iconBase64} alt="" className="mod-icon-img" />
+                        : (mod.enabled ? '🧩' : '⊘')
+                      }
+                    </div>
                     <div className="mod-row-info">
-                      <div className="mod-row-name">{mod.name}</div>
-                      {fmtModVersion(mod.version) && <div className="mod-row-version">{fmtModVersion(mod.version)}</div>}
+                      <div className="mod-row-name">{fmtModName(mod.name, mod.version)}</div>
                     </div>
                     <div className="mod-row-actions" onClick={e => e.stopPropagation()}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => handleToggle(mod.filename, mod.enabled)}>
-                        {mod.enabled ? '🔒 Desactivar' : '🔓 Activar'}
+                      <button className="btn btn-ghost btn-xs" onClick={() => handleToggle(mod.filename, mod.enabled)}>
+                        {mod.enabled ? '🔒' : '🔓'}
                       </button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(mod.filename)}>✕ Quitar</button>
+                      <button className="btn btn-danger btn-xs" onClick={() => handleDelete(mod.filename)}>✕</button>
                     </div>
                   </div>
                   {isExpanded && (
@@ -436,20 +469,24 @@ function ModsTab({ instance }) {
                 onClick={() => setExpandedMod(isExpanded ? null : mod.filename)}
                 style={{ cursor: 'pointer' }}
               >
-                <div className="mod-icon-box">{mod.enabled ? '🧩' : '⊘'}</div>
+                <div className="mod-icon-box">
+                  {mod.iconBase64
+                    ? <img src={mod.iconBase64} alt="" className="mod-icon-img" />
+                    : (mod.enabled ? '🧩' : '⊘')
+                  }
+                </div>
                 <div className="mod-info">
-                  <div className="mod-name">{mod.name}</div>
-                  {fmtModVersion(mod.version) && <div className="mod-desc">{fmtModVersion(mod.version)}</div>}
+                  <div className="mod-name">{fmtModName(mod.name, mod.version)}</div>
                   {isExpanded && (
                     <div className="mod-expanded-desc">
                       {mod.description || 'Sin descripción disponible'}
                     </div>
                   )}
                   <div className="mod-actions" onClick={e => e.stopPropagation()}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => handleToggle(mod.filename, mod.enabled)}>
-                      {mod.enabled ? '🔒 Desactivar' : '🔓 Activar'}
+                    <button className="btn btn-ghost btn-xs" onClick={() => handleToggle(mod.filename, mod.enabled)}>
+                      {mod.enabled ? '🔒' : '🔓'}
                     </button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(mod.filename)}>✕ Quitar</button>
+                    <button className="btn btn-danger btn-xs" onClick={() => handleDelete(mod.filename)}>✕</button>
                   </div>
                 </div>
               </div>
@@ -457,7 +494,6 @@ function ModsTab({ instance }) {
           })}
         </div>
       )}
-      </div>}
     </div>
   );
 }
@@ -821,10 +857,13 @@ function InstanceDetail({ instance }) {
     dispatch({ type: 'SET_GAME_RUNNING', payload: { running: true, instanceId: instance.id } });
   };
 
+  const modsCount = (state.instanceMods ?? []).length;
   const tabs = [
-    { id: 'mods',    label: '🧩 Mods' },
-    { id: 'stats',   label: '📊 Estadísticas' },
-    { id: 'console', label: '💻 Consola' },
+    { id: 'mods',          label: `🧩 Mods${modsCount > 0 ? ` (${modsCount})` : ''}` },
+    { id: 'resourcepacks', label: '🎨 Recursos' },
+    { id: 'shaderpacks',   label: '✨ Shaders' },
+    { id: 'stats',         label: '📊 Stats' },
+    { id: 'console',       label: '💻 Consola' },
   ];
 
   return (
@@ -918,9 +957,11 @@ function InstanceDetail({ instance }) {
 
       {/* Content */}
       <div className="instance-content">
-        {activeTab === 'mods'    && <ModsTab    instance={instance} />}
-        {activeTab === 'stats'   && <StatsTab   instance={instance} />}
-        {activeTab === 'console' && <ConsoleTab />}
+        {activeTab === 'mods'          && <ModsTab  instance={instance} />}
+        {activeTab === 'resourcepacks' && <PacksTab instance={instance} type="resourcepacks" />}
+        {activeTab === 'shaderpacks'   && <PacksTab instance={instance} type="shaderpacks" />}
+        {activeTab === 'stats'         && <StatsTab instance={instance} />}
+        {activeTab === 'console'       && <ConsoleTab />}
       </div>
 
       {/* Export instance modal */}
@@ -936,8 +977,8 @@ function InstanceDetail({ instance }) {
 
 /* ─── Main Panel ──────────────────────────────── */
 export default function MainPanel() {
-  const { state } = useStore();
-  const { instances, selectedInstanceId, activeTab } = state;
+  const { state, dispatch } = useStore();
+  const { instances, selectedInstanceId, activeTab, modpackImportMode } = state;
   const selected = instances.find(i => i.id === selectedInstanceId);
 
   // Global tabs take priority over instance view
@@ -945,6 +986,17 @@ export default function MainPanel() {
     return (
       <main className="main-panel">
         <SettingsPage />
+      </main>
+    );
+  }
+
+  // Modpack import wizard mode
+  if (modpackImportMode) {
+    return (
+      <main className="main-panel">
+        <ModpackImportWizard
+          onClose={() => dispatch({ type: 'SET_MODPACK_IMPORT_MODE', payload: false })}
+        />
       </main>
     );
   }

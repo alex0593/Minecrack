@@ -9,10 +9,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../store';
-import {
-  searchModpacks as searchModrinthPacks,
-  isCurseForgeConfigured: isModrinthConfigured,
-} from '../lib/api/modrinth';
+import { searchModpacks as searchModrinthPacks } from '../lib/api/modrinth';
 import {
   searchModpacks as searchCurseforgePacks,
   getModpackWithVersions as getCFModpackWithVersions,
@@ -78,39 +75,38 @@ function ModpackCard({ source, pack, onClick, isSelected }) {
   );
 }
 
-// ─── Step 1: Search ──────────────────────────────────────────────────────────
+// ─── Step 1: Explorer ────────────────────────────────────────────────────────
 function Step1Search({ onNext }) {
   const [source, setSource] = useState('modrinth');
-  const [query, setQuery] = useState('');
-  const [gameVersion, setGameVersion] = useState('1.20.1');
+  const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
-  const debounceRef = useRef(null);
 
-  const doSearch = useCallback(async (q, ver, src, off = 0) => {
-    if (!q.trim()) return;
+  // Cargar modpacks cuando cambia source o búsqueda
+  useEffect(() => {
+    loadModpacks();
+  }, [source, searchQuery]);
 
+  const loadModpacks = async (off = 0) => {
     setLoading(true);
     setError(null);
     try {
       let data;
-      if (src === 'modrinth') {
+      if (source === 'modrinth') {
         data = await searchModrinthPacks({
-          query: q,
-          gameVersion: ver || undefined,
+          query: searchQuery || '',
           limit: LIMIT,
           offset: off,
         });
-        if (off === 0) setResults(data.hits);
-        else setResults(prev => [...prev, ...data.hits]);
-        setTotal(data.total_hits);
+        if (off === 0) setResults(data.hits || []);
+        else setResults(prev => [...prev, ...(data.hits || [])]);
+        setTotal(data.total_hits || 0);
       } else {
-        // CurseForge
-        const result = await searchCurseforgePacks(q, {
-          gameVersion: ver || undefined,
+        // CurseForge - buscar con nombre o query vacía para populares
+        const result = await searchCurseforgePacks(searchQuery || ' ', {
           limit: LIMIT,
           offset: off,
         });
@@ -119,52 +115,51 @@ function Step1Search({ onNext }) {
         setTotal(result.pagination?.total || 0);
       }
     } catch (err) {
-      setError(err?.message || 'Error searching modpacks');
+      setError(err?.message || 'Error loading modpacks');
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const handleQueryChange = (e) => {
-    setQuery(e.target.value);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      doSearch(e.target.value, gameVersion, source, 0);
-      setOffset(0);
-    }, 400);
   };
 
   const handleSourceChange = (newSource) => {
     setSource(newSource);
     setResults([]);
     setOffset(0);
-    if (query) {
-      doSearch(query, gameVersion, newSource, 0);
-    }
   };
 
-  const handleVersionChange = (e) => {
-    setGameVersion(e.target.value);
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
     setResults([]);
     setOffset(0);
-    if (query) {
-      doSearch(query, e.target.value, source, 0);
-    }
   };
 
   const handleLoadMore = () => {
     const newOffset = offset + LIMIT;
     setOffset(newOffset);
-    doSearch(query, gameVersion, source, newOffset);
+    loadModpacks(newOffset);
   };
 
   const handleSelectPack = (pack) => {
-    onNext({ source, pack, gameVersion });
+    onNext({ source, pack, gameVersion: '1.20.1' });
   };
 
   return (
     <div className="wizard-step-search">
-      <h2>Search Modpacks</h2>
+      <div className="wizard-search-header">
+        <div>
+          <h2>Explorador de Modpacks</h2>
+          <p className="wizard-search-subtitle">Selecciona un modpack para comenzar</p>
+        </div>
+      </div>
+
+      {/* Search input */}
+      <input
+        type="text"
+        className="input wizard-search-input"
+        placeholder="🔍 Buscar modpack por nombre..."
+        value={searchQuery}
+        onChange={handleSearchChange}
+      />
 
       {/* Source tabs */}
       <div className="wizard-tabs">
@@ -172,37 +167,15 @@ function Step1Search({ onNext }) {
           className={`wizard-tab ${source === 'modrinth' ? 'active' : ''}`}
           onClick={() => handleSourceChange('modrinth')}
         >
-          Modrinth
+          📦 Modrinth
         </button>
         <button
           className={`wizard-tab ${source === 'curseforge' ? 'active' : ''}`}
           onClick={() => handleSourceChange('curseforge')}
           disabled={!isCurseForgeConfigured()}
         >
-          CurseForge
+          🎮 CurseForge
         </button>
-      </div>
-
-      {/* Search and filters */}
-      <div className="wizard-search-section">
-        <input
-          type="text"
-          className="input wizard-search-input"
-          placeholder="Search modpacks..."
-          value={query}
-          onChange={handleQueryChange}
-        />
-        <select
-          className="input wizard-version-select"
-          value={gameVersion}
-          onChange={handleVersionChange}
-        >
-          <option value="1.20.1">1.20.1</option>
-          <option value="1.20">1.20</option>
-          <option value="1.19.2">1.19.2</option>
-          <option value="1.19">1.19</option>
-          <option value="1.18.2">1.18.2</option>
-        </select>
       </div>
 
       {error && (
@@ -211,11 +184,15 @@ function Step1Search({ onNext }) {
         </div>
       )}
 
-      {/* Results grid */}
-      {loading && !results.length && (
-        <div className="wizard-loading">Searching...</div>
+      {/* Loading state */}
+      {loading && results.length === 0 && (
+        <div className="wizard-loading">
+          <div className="wizard-spinner"></div>
+          Cargando modpacks...
+        </div>
       )}
 
+      {/* Results grid */}
       {results.length > 0 && (
         <>
           <div className="wizard-results-grid">
@@ -230,20 +207,23 @@ function Step1Search({ onNext }) {
           </div>
 
           {offset + LIMIT < total && (
-            <button
-              className="btn btn-ghost"
-              onClick={handleLoadMore}
-              disabled={loading}
-            >
-              {loading ? 'Loading more...' : 'Load more'}
-            </button>
+            <div className="wizard-load-more-container">
+              <button
+                className="btn btn-ghost btn-lg"
+                onClick={handleLoadMore}
+                disabled={loading}
+              >
+                {loading ? '⏳ Cargando más...' : '📥 Cargar más modpacks'}
+              </button>
+            </div>
           )}
         </>
       )}
 
-      {!loading && results.length === 0 && query && !error && (
+      {!loading && results.length === 0 && !error && (
         <div className="wizard-no-results">
-          No modpacks found for "{query}"
+          <div className="wizard-no-results-icon">🔍</div>
+          <p>{searchQuery ? 'No se encontraron modpacks con ese nombre' : 'Cargando modpacks populares...'}</p>
         </div>
       )}
     </div>
@@ -298,7 +278,7 @@ function Step2Preview({ source, pack, gameVersion, onNext, onBack }) {
       };
 
   return (
-    <div className="wizard-step-preview">
+    <div className="wizard-step-preview compact">
       <h2>Modpack Preview</h2>
 
       {loading && <div className="wizard-loading">Loading versions...</div>}
@@ -371,6 +351,7 @@ function Step3Config({ pack, version, source, gameVersion, onNext, onBack }) {
           className="input"
           value={instanceName}
           onChange={(e) => setInstanceName(e.target.value)}
+          autoComplete="off"
         />
       </div>
 
@@ -484,15 +465,34 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           setProgress(50);
 
           const inspected = await inspectInstanceFolder(tempDir);
-          const instanceId = await importInstanceFromFolder(
+          const importResult = await importInstanceFromFolder(
+            launcherDir,
             tempDir,
             config.instanceName,
             config.icon,
             config.ram,
             config.jvmArgs
           );
+          const instanceId = importResult.newInstanceId;
 
-          dispatch({ type: 'ADD_INSTANCE', instance: { id: instanceId, ...inspected } });
+          // Transformar el resultado de inspección al formato de instancia
+          const newInstance = {
+            id: instanceId,
+            name: config.instanceName || inspected.name,
+            version: inspected.mc_version,
+            loader: inspected.loader,
+            loaderVersion: inspected.loader_version,
+            icon: config.icon || '📦',
+            ram: config.ram ? parseInt(config.ram) : 2048,
+            jvmArgs: config.jvmArgs || '',
+            installed: true,
+            createdAt: new Date().toISOString(),
+            lastPlayed: null,
+            playtime: 0,
+            modsCount: inspected.mods_count || 0,
+          };
+
+          dispatch({ type: 'ADD_INSTANCE', payload: newInstance });
 
           // Download mods if referenced
           if (inspected.mods && inspected.mods.length > 0) {
@@ -539,15 +539,34 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           setProgress(50);
 
           const inspected = await inspectInstanceFolder(tempDir);
-          const instanceId = await importInstanceFromFolder(
+          const importResult = await importInstanceFromFolder(
+            launcherDir,
             tempDir,
             config.instanceName,
             config.icon,
             config.ram,
             config.jvmArgs
           );
+          const instanceId = importResult.newInstanceId;
 
-          dispatch({ type: 'ADD_INSTANCE', instance: { id: instanceId, ...inspected } });
+          // Transformar el resultado de inspección al formato de instancia
+          const newInstance = {
+            id: instanceId,
+            name: config.instanceName || inspected.name,
+            version: inspected.mc_version,
+            loader: inspected.loader,
+            loaderVersion: inspected.loader_version,
+            icon: config.icon || '📦',
+            ram: config.ram ? parseInt(config.ram) : 2048,
+            jvmArgs: config.jvmArgs || '',
+            installed: true,
+            createdAt: new Date().toISOString(),
+            lastPlayed: null,
+            playtime: 0,
+            modsCount: inspected.mods_count || 0,
+          };
+
+          dispatch({ type: 'ADD_INSTANCE', payload: newInstance });
 
           // Note: Modrinth mods download is handled differently
           // For now, just mark as complete
@@ -619,19 +638,8 @@ export default function ModpackImportWizard({ onClose }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="wizard-modal">
-        {/* Step indicator */}
-        <div className="wizard-steps-indicator">
-          <div className={`wizard-step-dot ${currentStep === 'search' ? 'active' : currentStep !== 'search' ? 'done' : ''}`}>1</div>
-          <div className="wizard-step-line" />
-          <div className={`wizard-step-dot ${currentStep === 'preview' ? 'active' : currentStep !== 'preview' && currentStep !== 'search' ? 'done' : ''}`}>2</div>
-          <div className="wizard-step-line" />
-          <div className={`wizard-step-dot ${currentStep === 'config' ? 'active' : currentStep === 'install' ? 'done' : ''}`}>3</div>
-          <div className="wizard-step-line" />
-          <div className={`wizard-step-dot ${currentStep === 'install' ? 'active' : ''}`}>4</div>
-        </div>
-
+    <div className={`wizard-container ${currentStep === 'preview' ? 'wizard-container-compact' : ''}`}>
+      <div className={`wizard-modal ${currentStep === 'preview' ? 'wizard-modal-compact' : ''}`}>
         {/* Content */}
         <div className="wizard-content">
           {currentStep === 'search' && (

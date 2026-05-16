@@ -320,6 +320,14 @@ export const installJavaRuntime = (majorVersion, launcherDir) =>
 export const downloadMod = (launcherDir, instanceId, url, filename, sha1 = null) =>
   tauriCmd('download_mod', { launcherDir, instanceId, url, filename, sha1 });
 
+/** Descarga un resource pack directamente a instances/{id}/resourcepacks/ */
+export const downloadResourcePack = (launcherDir, instanceId, url, filename, sha1 = null) =>
+  tauriCmd('download_resourcepack', { launcherDir, instanceId, url, filename, sha1 });
+
+/** Descarga un shaderpack directamente a instances/{id}/shaderpacks/ */
+export const downloadShaderPack = (launcherDir, instanceId, url, filename, sha1 = null) =>
+  tauriCmd('download_shaderpack', { launcherDir, instanceId, url, filename, sha1 });
+
 /**
  * Lista todos los mods de una instancia leyendo desde disco.
  * @returns {Promise<Array>} Array de { filename, name, version, enabled }
@@ -443,8 +451,8 @@ export const inspectInstanceZip = (zipPath) =>
  * Importa instancia desde carpeta
  * @returns {Promise<{newInstanceId, imported}>}
  */
-export const importInstanceFromFolder = (launcherDir, folderPath, newName) =>
-  tauriCmd('import_instance_from_folder', { launcherDir, folderPath, newName });
+export const importInstanceFromFolder = (launcherDir, folderPath, newName, icon, ram, jvmArgs) =>
+  tauriCmd('import_instance_from_folder', { launcherDir, folderPath, newName, icon, ram, jvmArgs });
 
 /**
  * Importa instancia desde ZIP
@@ -518,6 +526,8 @@ async function mockCommand(command, _args) {
     case 'install_java_runtime':
       return Promise.resolve('/mock/runtimes/java-21/bin/java');
     case 'download_mod':
+    case 'download_resourcepack':
+    case 'download_shaderpack':
       return Promise.resolve();
     case 'list_mods':
       return Promise.resolve([

@@ -116,15 +116,15 @@
 /* ---- Instance tabs ---- */
 .instance-tabs {
   display: flex;
-  padding: 0 var(--gap-xl);
+  padding: 0 var(--gap-lg);
   border-bottom: 1px solid var(--border);
   gap: 0;
   flex-shrink: 0;
 }
 
 .instance-tab {
-  padding: 12px 20px;
-  font-size: 13px;
+  padding: 10px 16px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
@@ -148,16 +148,10 @@
   padding: var(--gap-lg) var(--gap-xl);
 }
 
-/* Mods sub-tabs */
-.mods-subtabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0;
-}
+/* mods-subtabs eliminado — Resource Packs y Shaders son ahora tabs principales */
 
 .mods-subtab {
+  display: none; /* legacy */
   padding: 6px 14px;
   font-size: 12px;
   font-weight: 500;
@@ -233,15 +227,15 @@
 .mod-card.disabled { opacity: 0.5; }
 
 .mod-icon-box {
-  width: 42px;
-  height: 42px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-sm);
   background: var(--bg-base);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 24px;
   flex-shrink: 0;
 }
 
@@ -249,6 +243,73 @@
 .mod-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
 .mod-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .mod-actions { display: flex; gap: 6px; margin-top: 8px; }
+
+/* Icono de mod como imagen */
+.mod-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  display: block;
+  image-rendering: pixelated; /* Para iconos de Minecraft estilo pixel-art */
+}
+
+/* Icono tiny en modo compacto */
+.mod-compact-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 3px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+/* Barra de búsqueda de mods */
+.mods-search-bar {
+  position: relative;
+  margin: 8px 0 6px;
+}
+
+.mods-search-input {
+  width: 100%;
+  padding: 7px 36px 7px 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.mods-search-input:focus {
+  border-color: var(--accent);
+}
+
+.mods-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.mods-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.mods-search-clear:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
 
 /* Stats tab */
 .stats-grid {
@@ -388,15 +449,15 @@
 .mod-row.disabled { opacity: 0.5; }
 
 .mod-row-icon {
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-sm);
   background: var(--bg-base);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 20px;
   flex-shrink: 0;
 }
 

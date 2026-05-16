@@ -58,7 +58,60 @@ async function getFabricInstallerInfo(gameVersion, loaderVersion) {
  * @param {object} installerInfo - Info del instalador de Fabric (incluye todas las libs)
  * @returns {object} JSON del perfil de Fabric
  */
+/**
+ * Convierte un nombre Maven "group:artifact:version[:classifier]"
+ * al path relativo dentro de libraries/
+ */
+function mavenNameToPath(name) {
+  const parts = name.split(':');
+  if (parts.length < 3) return null;
+  const [group, artifact, version, classifier] = parts;
+  const groupPath = group.replace(/\./g, '/');
+  const jarName = classifier
+    ? `${artifact}-${version}-${classifier}.jar`
+    : `${artifact}-${version}.jar`;
+  return `${groupPath}/${artifact}/${version}/${jarName}`;
+}
+
+/**
+ * Normaliza las librerías del perfil de Fabric al formato estándar con downloads.artifact.
+ * La API de Fabric usa dos formatos:
+ *   - Antiguo: { downloads: { artifact: { path, url, sha1 } } }
+ *   - Nuevo:   { name, url }  ← Rust no puede leer esto
+ * Aquí convertimos todo al formato antiguo que Rust entiende.
+ */
+function normalizeFabricLibraries(libs = []) {
+  return libs.map(lib => {
+    // Ya tiene el formato estándar con downloads.artifact → dejar tal cual
+    if (lib.downloads?.artifact?.path) return lib;
+
+    // Formato nuevo: { name, url } → convertir
+    if (lib.name && lib.url !== undefined) {
+      const path = mavenNameToPath(lib.name);
+      if (!path) return lib;
+      const baseUrl = lib.url.endsWith('/') ? lib.url : lib.url + '/';
+      return {
+        name: lib.name,
+        downloads: {
+          artifact: {
+            path,
+            url: baseUrl + path,
+            sha1: lib.sha1 || '',
+            size: lib.size || 0,
+          },
+        },
+      };
+    }
+
+    return lib;
+  }).filter(lib => lib.downloads?.artifact?.path); // Descartar entradas sin path resolvible
+}
+
 export function generateFabricProfile(versionData, fabricVersion, gameVersion, installerInfo = null) {
+  // Normalizar librerías al formato que Rust puede leer (downloads.artifact.path)
+  const rawLibs = installerInfo?.libraries || [];
+  const libraries = normalizeFabricLibraries(rawLibs);
+
   const profile = {
     id: `${gameVersion}-fabric-${fabricVersion}`,
     inheritsFrom: gameVersion,
@@ -70,9 +123,7 @@ export function generateFabricProfile(versionData, fabricVersion, gameVersion, i
       game: versionData.arguments?.game || [],
       jvm: versionData.arguments?.jvm || [],
     },
-    // El Fabric Meta API ahora devuelve TODAS las librerías necesarias (ASM, Mixin, fabric-loader, etc.)
-    // No es necesario agregar librerías manualmente
-    libraries: installerInfo?.libraries || [],
+    libraries,
   };
 
   return profile;
@@ -227,7 +278,7 @@ export async function installFabric(gameVersion, loaderVersion, launcherDir, ver
     console.log('[Fabric] Instalación completada');
 
     return {
-      loaderVersion: selectedVersion,
+      loaderVersion: profileId,
       profile: fabricProfile,
       downloadTasks,
     };

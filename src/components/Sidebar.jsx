@@ -68,7 +68,7 @@ export default function Sidebar() {
         <button
           id="btn-download-modpack-sidebar"
           className="sidebar-nav-item"
-          onClick={() => openModal('modpackImport')}
+          onClick={() => dispatch({ type: 'SET_MODPACK_IMPORT_MODE', payload: true })}
           title="Descargar modpack desde CurseForge o Modrinth"
         >
           <span className="nav-icon">📦</span>
@@ -117,7 +117,10 @@ export default function Sidebar() {
                 key={inst.id}
                 id={`instance-${inst.id}`}
                 className={`instance-card${selectedInstanceId === inst.id ? ' is-selected' : ''}`}
-                onClick={() => dispatch({ type: 'SELECT_INSTANCE', payload: inst.id })}
+                onClick={() => {
+                  dispatch({ type: 'SELECT_INSTANCE', payload: inst.id });
+                  dispatch({ type: 'SET_MODPACK_IMPORT_MODE', payload: false });
+                }}
               >
                 <div className="instance-card-icon">{inst.icon}</div>
                 <div className="instance-card-body">

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../store';
 import { searchResourcePacks as searchModrinthPacks, getProjectVersions, getProject } from '../lib/api/modrinth';
 import { searchResourcePacks as searchCFPacks, getMod, getModFiles } from '../lib/api/curseforge';
-import { downloadMod, getLauncherDir, listResourcePacks, tauriListen } from '../lib/tauri';
+import { downloadResourcePack, getLauncherDir, listResourcePacks, tauriListen } from '../lib/tauri';
 import { getFile as getCFFile, extractSha1 } from '../lib/api/curseforge';
 import Select from './ui/Select';
 import './PackBrowserModal.css';
@@ -80,9 +80,9 @@ function PackDetail({ pack, instance, source, onInstalled }) {
         sha1 = extractSha1(fileInfo);
       }
 
-      // Descargar el pack
+      // Descargar el pack directamente a la carpeta resourcepacks/
       setProgress({ label: `Descargando ${fileName}`, percent: 0 });
-      await downloadMod(
+      await downloadResourcePack(
         launcherDir,
         instance.id,
         downloadUrl,

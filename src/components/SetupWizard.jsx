@@ -145,12 +145,13 @@ export default function SetupWizard() {
                   Directorio de datos
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input 
+                  <input
                     type="text"
                     className="input"
                     value={gameDir}
                     onChange={(e) => setGameDir(e.target.value)}
                     style={{ fontSize: 13, padding: '12px 14px', flex: 1 }}
+                    autoComplete="off"
                   />
                   <button className="btn btn-ghost" onClick={handlePickDir}>
                     📁 Examinar...
@@ -249,7 +250,7 @@ export default function SetupWizard() {
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>
                   Nombre de usuario
                 </label>
-                <input 
+                <input
                   type="text"
                   className="input"
                   placeholder="Ej: Steve_Pro"
@@ -257,6 +258,7 @@ export default function SetupWizard() {
                   onChange={(e) => setNickname(e.target.value)}
                   autoFocus
                   style={{ fontSize: 16, padding: '14px 16px' }}
+                  autoComplete="off"
                 />
               </div>
 

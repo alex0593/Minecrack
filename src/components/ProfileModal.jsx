@@ -195,6 +195,7 @@ export default function ProfileModal() {
                     maxLength={16}
                     autoFocus
                     onKeyDown={e => e.key === 'Enter' && handleSave()}
+                    autoComplete="off"
                   />
                   {nameError && <p className="profile-error">{nameError}</p>}
                   <div className="profile-counter">{username.length}/16</div>

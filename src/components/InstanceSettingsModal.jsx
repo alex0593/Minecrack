@@ -76,6 +76,7 @@ export default function InstanceSettingsModal({ instanceId, onClose }) {
               onChange={e => setName(e.target.value)}
               maxLength={48}
               placeholder="Nombre de la instancia"
+              autoComplete="off"
             />
           </div>
 

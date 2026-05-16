@@ -25,7 +25,7 @@ export async function searchModpacks(query, options = {}) {
       searchFilter: query,
       pageSize: limit,
       index: offset,
-      sortField: sortBy, // 'downloads', 'name', 'dateCreated'
+      sortField: mapSortFieldToCF(sortBy),
     });
 
     if (gameVersion) {
@@ -244,4 +244,18 @@ export function formatModpackInfo(modpack, version) {
  */
 export function isCurseForgeConfigured() {
   return API.CURSEFORGE.isConfigured();
+}
+
+/**
+ * Mapea el string de ordenamiento a ModsSearchSortField de CurseForge
+ * 1 = Featured, 2 = Popularity, 3 = LastUpdated, 4 = Name, 6 = TotalDownloads
+ */
+function mapSortFieldToCF(sortBy) {
+  const mapping = {
+    downloads: 2,
+    name: 4,
+    dateCreated: 3,
+    featured: 1
+  };
+  return mapping[sortBy] || 2;
 }

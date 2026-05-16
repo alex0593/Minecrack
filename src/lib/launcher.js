@@ -1,29 +1,37 @@
-// launcher.js — Lógica de lanzamiento del juego
-import { buildLaunchArgs } from './instances';
-import { buildClasspath } from './mojang';
-import { tauriCmd, tauriListen, ensureDir, readFile, fileExists, installJavaRuntime } from './tauri';
+// launcher.js — Optimized game launch (Rust-delegated heavy computation)
+// Migration: All heavy processing moved to Rust prepare_game_launch command
+// JavaScript now handles only orchestration, UI updates, and event listening
+
+import { tauriCmd, tauriListen, ensureDir, readFile, writeFile, fileExists } from './tauri';
 import { getRequiredJavaVersion } from './prism';
 import { installLoader } from './loaders';
 import { downloadQueue } from './downloader';
 import { LAUNCHER } from '../config';
 import { applySkinToInstance } from './skin';
+import { validateJavaInstallation, autoRepairJava } from './java-repair';
+import { validateMinecraftJar, autoRepairMinecraftJar } from './minecraft-jar-repair';
+import { getLoaderInstallerPath } from './loader-repair';
 
 function getLoaderProfileId(instance) {
   const { loader, loaderVersion, version } = instance;
   if (!loaderVersion || loader === 'vanilla') return null;
+
+  // New format: loaderVersion already IS the full profileId (contains loader name embedded)
+  // E.g., "1.20.1-fabric-0.19.2", "1.20.1-neoforge-47.1.106" — use as-is to avoid double prefix
+  if (loader === 'fabric'   && loaderVersion.includes('-fabric-'))   return loaderVersion;
+  if (loader === 'quilt'    && loaderVersion.includes('-quilt-'))     return loaderVersion;
+  if (loader === 'neoforge' && loaderVersion.includes('-neoforge-')) return loaderVersion;
+
+  // Legacy/bare format — build the profileId from parts
   if (loader === 'fabric')   return `${version}-fabric-${loaderVersion}`;
   if (loader === 'quilt')    return `${version}-quilt-${loaderVersion}`;
   if (loader === 'neoforge') return `${version}-neoforge-${loaderVersion}`;
-  if (loader === 'forge')    return loaderVersion; // Forge usa el loaderVersion como ID: "1.20.1-47.2.0"
+  if (loader === 'forge')    return loaderVersion; // Forge: loaderVersion IS the profileId (e.g., "1.19.2-43.5.0")
   return null;
 }
 
 /**
- * Auto-repara perfiles Forge/NeoForge legacy (sin formatVersion: 2).
- * Estos perfiles fueron generados antes del fix de mavenFiles y carecen
- * del installer JAR + dependencias auxiliares que ForgeWrapper necesita.
- *
- * @returns {Promise<boolean>} true si se realizó reparación, false si no fue necesaria
+ * Auto-repair legacy Forge/NeoForge profiles (without formatVersion: 2)
  */
 async function ensureLoaderProfileUpToDate(instance, launcherDir, versionData, onRepairProgress) {
   if (instance.loader !== 'forge' && instance.loader !== 'neoforge') return false;
@@ -43,6 +51,14 @@ async function ensureLoaderProfileUpToDate(instance, launcherDir, versionData, o
       if (!existing.formatVersion || existing.formatVersion < 2) {
         needsRepair = true;
         reason = `formatVersion=${existing.formatVersion ?? 'undefined'} (legacy)`;
+      } else {
+        // Detectar perfil ForgeWrapper sin mavenFiles: el installer no puede ejecutarse sin ellos.
+        // Ocurre cuando el perfil fue generado por una versión anterior del launcher (sin soporte mavenFiles).
+        const isForgeWrapper = existing.mainClass?.toLowerCase().includes('forgewrapper');
+        if (isForgeWrapper && !(existing.mavenFiles?.length > 0)) {
+          needsRepair = true;
+          reason = 'ForgeWrapper detectado pero mavenFiles ausentes';
+        }
       }
     } catch (err) {
       needsRepair = true;
@@ -55,9 +71,15 @@ async function ensureLoaderProfileUpToDate(instance, launcherDir, versionData, o
   console.log(`[Launcher] Auto-reparación de ${instance.loader}: ${reason}`);
   onRepairProgress?.({ phase: 'start', label: `Reparando instalación de ${instance.loader}…`, percent: 0 });
 
+  // Extract the bare loader version from the composite profileId so installLoader
+  // can query Prism Meta correctly. E.g., "1.20.1-neoforge-47.1.106" → "47.1.106"
+  const { extractRealVersion } = await import('./loader-repair.js');
+  const realLoaderVersion = extractRealVersion(instance.loader, instance.loaderVersion);
+  console.log(`[Launcher] Reparando ${instance.loader} con versión real: ${realLoaderVersion} (desde "${instance.loaderVersion}")`);
+
   const result = await installLoader(
     instance.loader,
-    instance.loaderVersion,
+    realLoaderVersion,
     instance.version,
     launcherDir,
     versionData,
@@ -87,247 +109,406 @@ async function ensureLoaderProfileUpToDate(instance, launcherDir, versionData, o
   return true;
 }
 
+/**
+ * MAIN GAME LAUNCH — Optimized with Rust delegation
+ *
+ * Flow:
+ * 1. Pre-flight checks: Java validation/repair, Minecraft JAR repair
+ * 2. Ensure loader profiles are up-to-date
+ * 3. Apply skins (best-effort)
+ * 4. Delegate heavy preparation to Rust (prepare_game_launch command)
+ * 5. Launch game with the returned LaunchConfig
+ * 6. Listen for game events
+ */
 export async function launchGameInstance({ instance, profile, launcherDir, versionData, onJavaProgress, onRepairProgress }) {
   try {
-    // Detectar Java y elegir la versión correcta
-    // Usamos Prism Meta como fuente primaria para el requisito de Java (más confiable)
-    // Pasamos launcherDir para que busque también en runtimes/
+    console.log(`[Launcher] ========== INICIANDO LANZAMIENTO ==========`);
+    console.log(`[Launcher] Instancia: ${instance.id} (${instance.version})`);
+    console.log(`[Launcher] Loader: ${instance.loader}${instance.loaderVersion ? ` v${instance.loaderVersion}` : ''}`);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FASE 1: Validar y reparar Java (crítico — no se puede lanzar sin él)
+    // ─────────────────────────────────────────────────────────────────────────
+    console.log(`[Launcher] FASE 1: Validación de Java...`);
     const javaPaths = await tauriCmd('detect_java', { launcherDir });
     const prismJava = await getRequiredJavaVersion(instance.version).catch(() => null);
     const requiredMajor = prismJava ?? versionData?.javaVersion?.majorVersion ?? 17;
-    console.log(`[Launcher] Java requerido para MC ${instance.version}: ${requiredMajor}`);
+    console.log(`[Launcher] Java requerido: ${requiredMajor}`);
 
-    // Para Java 8, buscar EXACTAMENTE 8 (LaunchWrapper no es compatible con 9+)
-    // Para otras versiones, usar >= requiredMajor
-    let suitable;
-    if (requiredMajor === 8) {
-      suitable = javaPaths.filter(j => j.major_version === 8);
-    } else {
-      suitable = javaPaths.filter(j => j.major_version >= requiredMajor);
+    // Filtrar Java adecuado por versión
+    let suitable = requiredMajor === 8
+      ? javaPaths.filter(j => j.major_version === 8)
+      : javaPaths.filter(j => j.major_version >= requiredMajor);
+
+    // Ordenar: rutas absolutas primero (evita usar bare "java" cuando hay ruta completa disponible)
+    const isAbsPath = (p) => p.includes('/') || p.includes('\\');
+    suitable.sort((a, b) => {
+      const aIsAbs = isAbsPath(a.path);
+      const bIsAbs = isAbsPath(b.path);
+      if (aIsAbs !== bIsAbs) return aIsAbs ? -1 : 1;
+      return 0;
+    });
+
+    // Validar el mejor candidato (solo rutas absolutas — los comandos bare ya los verificó detect_java)
+    if (suitable.length > 0) {
+      const candidate = suitable[0];
+      console.log(`[Launcher] Verificando Java: ${candidate.path}`);
+
+      if (isAbsPath(candidate.path)) {
+        const validation = await validateJavaInstallation(candidate.path);
+        if (!validation.valid) {
+          console.warn(`[Launcher] Java no válido: ${validation.reason}`);
+          console.log(`[Launcher] Intentando auto-reparación...`);
+          onJavaProgress?.({ phase: 'repair', percent: 0, requiredMajor });
+          try {
+            const repairResult = await autoRepairJava(requiredMajor, launcherDir, onJavaProgress);
+            if (repairResult.success) {
+              suitable = [{ path: repairResult.javaPath, major_version: requiredMajor }];
+              console.log(`[Launcher] ✓ Java reparado: ${repairResult.javaPath}`);
+              onJavaProgress?.({ phase: 'done', percent: 100, requiredMajor });
+            } else {
+              throw new Error(`Reparación fallida: ${repairResult.error}`);
+            }
+          } catch (err) {
+            console.error(`[Launcher] Reparación falló, descargando nueva copia...`);
+            suitable = [];
+          }
+        }
+      } else {
+        // Comando bare (ej: "java") — detect_java ya lo verificó al ejecutarlo para obtener la versión
+        console.log(`[Launcher] Java bare command "${candidate.path}" — aceptado (pre-verificado por detect_java)`);
+      }
     }
 
-    // Si no hay Java adecuado, descargarlo automáticamente
+    // Si no hay Java, descargarlo
     if (suitable.length === 0) {
-      console.log(`[Launcher] No hay Java ${requiredMajor}${requiredMajor === 8 ? ' (exacto)' : '+'}. Descargando automáticamente...`);
+      console.log(`[Launcher] Descargando Java ${requiredMajor}...`);
       onJavaProgress?.({ phase: 'start', percent: 0, requiredMajor });
-
       try {
-        const javaExePath = await installJavaRuntime(requiredMajor, launcherDir);
-
-        // ✓ VALIDACIÓN CRÍTICA: La descarga debe retornar una ruta válida
+        const javaExePath = await tauriCmd('install_java_runtime', { majorVersion: requiredMajor, launcherDir });
         if (!javaExePath || typeof javaExePath !== 'string' || javaExePath.trim() === '') {
-          throw new Error(`Descarga de Java retornó ruta inválida: "${javaExePath}"`);
+          throw new Error(`Ruta inválida: "${javaExePath}"`);
         }
-
-        onJavaProgress?.({ phase: 'done', percent: 100, requiredMajor });
         suitable = [{ path: javaExePath, major_version: requiredMajor }];
-        console.log(`[Launcher] ✓ Java ${requiredMajor} descargado exitosamente: ${javaExePath}`);
+        console.log(`[Launcher] ✓ Java descargado: ${javaExePath}`);
+        onJavaProgress?.({ phase: 'done', percent: 100, requiredMajor });
       } catch (err) {
-        const errMsg = err?.message || String(err);
-        console.error(`[Launcher] ✗ CRÍTICO: No se pudo descargar Java ${requiredMajor}: ${errMsg}`);
+        console.error(`[Launcher] ✗ No se pudo descargar Java: ${err.message}`);
         throw new Error(
           `No se pudo descargar Java ${requiredMajor}.\n\n` +
           `Causas posibles:\n` +
           `• Sin conexión a internet\n` +
           `• Adoptium API no disponible\n` +
           `• Espacio en disco insuficiente\n\n` +
-          `Error: ${errMsg}\n\n` +
-          `Solución: Instala Java 17+ manualmente de https://www.oracle.com/java/technologies/downloads/`
+          `Error: ${err.message}`
         );
       }
     }
 
-    // Ordenar por preferencia: exacta primero, luego por versión
     suitable.sort((a, b) => {
+      // Prefer absolute paths > bare commands, then exact version match, then ascending version
+      const aIsAbs = isAbsPath(a.path);
+      const bIsAbs = isAbsPath(b.path);
+      if (aIsAbs !== bIsAbs) return aIsAbs ? -1 : 1;
       const aExact = a.major_version === requiredMajor ? 0 : 1;
       const bExact = b.major_version === requiredMajor ? 0 : 1;
       if (aExact !== bExact) return aExact - bExact;
       return a.major_version - b.major_version;
     });
 
-    // ✓ VALIDACIÓN CRÍTICA: Asegurar que hay una ruta Java válida
     if (!suitable || suitable.length === 0) {
-      throw new Error('No se encontró Java instalado. Instala JDK 17 o superior.');
+      throw new Error('No se encontró Java instalado.');
     }
 
     const javaPath = suitable[0].path;
-    if (!javaPath) {
-      throw new Error(`Error crítico: ruta de Java es vacía o undefined. Instalación de Java corrupta?`);
+    console.log(`[Launcher] ✓ Java v${suitable[0].major_version} listo: ${javaPath}`);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FASE 2: Validar Minecraft JAR (crítico para Forge/NeoForge)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (instance.loader === 'forge' || instance.loader === 'neoforge') {
+      console.log(`[Launcher] FASE 2: Validación de Minecraft JAR...`);
+      const { getClientJarPath, validateMinecraftJar, autoRepairMinecraftJar } = await import('./minecraft-jar-repair.js');
+      const jarPath = getClientJarPath(launcherDir, instance.version);
+      const validation = await validateMinecraftJar(jarPath);
+
+      if (!validation.valid) {
+        console.warn(`[Launcher] JAR faltante: ${validation.reason}`);
+        onRepairProgress?.({ phase: 'jar', label: `Descargando Minecraft ${instance.version}...`, percent: 0 });
+        const repair = await autoRepairMinecraftJar(instance.version, versionData, launcherDir, onRepairProgress);
+        if (!repair.success) {
+          throw new Error(`Failed to download Minecraft JAR: ${repair.error}`);
+        }
+        console.log(`[Launcher] ✓ Minecraft JAR listo: ${repair.jarPath}`);
+      } else {
+        console.log(`[Launcher] ✓ Minecraft JAR validado: ${jarPath}`);
+      }
     }
 
-    console.log(`[Launcher] ✓ Java detectado: v${suitable[0].major_version}`);
-    console.log(`[Launcher] ✓ Ruta Java: ${javaPath}`);
-    console.log(`[Launcher] (requería v${requiredMajor}+)`);
-
-    // Directorio de assets
-    const assetsDir = `${launcherDir}/assets`;
-
-    // Auto-reparar perfiles Forge/NeoForge legacy antes de cargar
+    // ─────────────────────────────────────────────────────────────────────────
+    // FASE 3: Validar y reparar perfiles del loader
+    // ─────────────────────────────────────────────────────────────────────────
+    console.log(`[Launcher] FASE 3: Validación de perfil del loader...`);
     await ensureLoaderProfileUpToDate(instance, launcherDir, versionData, onRepairProgress);
 
-    // Aplicar skin custom si corresponde (no bloquea — best effort)
+    // FASE 3.5: Cargar perfil de loader si existe (Forge, Quilt, NeoForge)
+    // Variable para acumular argumentos Java temporales (incluyendo instalador si aplica)
+    let javaArgsForLaunch = instance.javaArgs || '';
+
+    // Si el loader no es vanilla, debemos cargar su perfil para obtener el mainClass y librerías correctas
+    if (instance.loader !== 'vanilla' && instance.loaderVersion) {
+      // Resolver la ruta del perfil — probamos varios candidatos porque el loaderVersion
+      // puede venir en distintos formatos según si la instancia fue creada antes o después del fix:
+      //   Legacy:  "1.20.1-0.19.2"                 → busca en versions/1.20.1-fabric-0.19.2/
+      //   Nuevo:   "1.20.1-fabric-0.19.2"           → busca en versions/1.20.1-fabric-0.19.2/ (correcto)
+      //   Forge:   "1.20.1-47.4.20"                 → busca en versions/1.20.1-47.4.20/ (correcto)
+      const loaderName = instance.loader; // 'fabric' | 'quilt' | 'forge' | 'neoforge'
+      const lv = instance.loaderVersion;
+      const mcv = instance.version;
+
+      // Candidatos en orden de preferencia
+      const profileCandidates = [
+        lv,                                        // tal cual está guardado (nuevo formato o Forge)
+        `${mcv}-${loaderName}-${lv.replace(`${mcv}-`, '')}`, // legacy sin loader name → agregar
+      ].filter((v, i, arr) => arr.indexOf(v) === i); // deduplicar
+
+      let loaderProfileText = null;
+      let loaderProfilePath = null;
+      let effectiveCandidate = lv; // tracks which candidate profile was actually found
+      for (const candidate of profileCandidates) {
+        const candidatePath = `${launcherDir}/versions/${candidate}/${candidate}.json`;
+        try {
+          loaderProfileText = await readFile(candidatePath);
+          loaderProfilePath = candidatePath;
+          effectiveCandidate = candidate; // remember the version string that matched on disk
+          // Si el candidato difiere del loaderVersion guardado, actualizar instancia en disco
+          if (candidate !== lv) {
+            console.log(`[Launcher] ✓ Perfil encontrado via candidato alternativo: ${candidate}`);
+            // Actualizar loaderVersion en instances.json silenciosamente para futuros lanzamientos
+            try {
+              const instancesPath = `${launcherDir}/instances.json`;
+              const instancesText = await readFile(instancesPath);
+              const instances = JSON.parse(instancesText);
+              const idx = instances.findIndex(i => i.id === instance.id);
+              if (idx !== -1) {
+                instances[idx].loaderVersion = candidate;
+                await writeFile(instancesPath, JSON.stringify(instances, null, 2));
+                console.log(`[Launcher] ✓ loaderVersion corregido en instances.json: ${lv} → ${candidate}`);
+              }
+            } catch (updateErr) {
+              console.warn(`[Launcher] No se pudo actualizar loaderVersion en instances.json:`, updateErr.message);
+            }
+          }
+          break;
+        } catch (_) {
+          // siguiente candidato
+        }
+      }
+
+      if (!loaderProfileText) {
+        console.warn(`[Launcher] ⚠️ Perfil de ${loaderName} no encontrado. Candidatos probados: ${profileCandidates.join(', ')}`);
+      }
+
+      try {
+        if (!loaderProfileText) throw new Error(`Perfil no encontrado en disco`);
+        const loaderProfile = JSON.parse(loaderProfileText);
+
+        // Detectar perfil legacy de Fabric/Quilt: librerías sin downloads.artifact (formato antiguo incorrecto)
+        // Si las librerías no tienen el path que Rust puede leer, el juego lanza vanilla en lugar del loader
+        const isFabricLike = instance.loader === 'fabric' || instance.loader === 'quilt';
+        const hasUsableLibraries = (loaderProfile.libraries ?? []).some(lib => lib.downloads?.artifact?.path);
+        if (isFabricLike && !hasUsableLibraries && (loaderProfile.libraries ?? []).length > 0) {
+          console.warn(`[Launcher] ⚠️ Perfil de ${instance.loader} tiene librerías en formato legacy (sin downloads.artifact). Reinstalando...`);
+          const { installLoader } = await import('./loaders');
+          const { downloadQueue } = await import('./downloader.js');
+          // Extract the bare loader version from the effective profileId for installLoader.
+          // E.g., effectiveCandidate "1.20.1-fabric-0.19.2" → "0.19.2" for Fabric API.
+          const { extractRealVersion } = await import('./loader-repair.js');
+          const reinstallVersion = extractRealVersion(instance.loader, effectiveCandidate);
+          console.log(`[Launcher] Reinstalando ${instance.loader} con versión: ${reinstallVersion}`);
+          const loaderResult = await installLoader(
+            instance.loader,
+            reinstallVersion,
+            instance.version,
+            launcherDir,
+            versionData
+          );
+          if (loaderResult.downloadTasks?.length > 0) {
+            await new Promise((resolve, reject) => {
+              downloadQueue({
+                tasks: loaderResult.downloadTasks,
+                concurrency: 4,
+                onDone: ({ failed }) => failed > 0 ? reject(new Error(`${failed} libs fallaron`)) : resolve(),
+              }).run().catch(reject);
+            });
+          }
+          // Releer el perfil regenerado
+          const newProfileText = await readFile(loaderProfilePath);
+          Object.assign(loaderProfile, JSON.parse(newProfileText));
+          console.log(`[Launcher] ✓ Perfil de ${instance.loader} regenerado con ${loaderProfile.libraries?.length ?? 0} librerías normalizadas`);
+        }
+
+        // Actualizar versionData con el mainClass del loader si existe
+        if (loaderProfile.mainClass) {
+          console.log(`[Launcher] ✓ Perfil de ${instance.loader} cargado: mainClass=${loaderProfile.mainClass}`);
+          versionData.mainClass = loaderProfile.mainClass;
+        }
+
+        // Argumentos del juego: el perfil del loader tiene prioridad sobre vanilla.
+        // IMPORTANTE: Si el loader usa minecraftArguments (string legacy, Forge/ForgeWrapper),
+        // debemos ANULAR versionData.arguments (array moderno de vanilla) para que Rust
+        // no lo priorice y use en su lugar el minecraftArguments de Forge que incluye
+        // los parámetros --launchTarget, --fml.forgeVersion, etc.
+        if (loaderProfile.minecraftArguments) {
+          versionData.minecraftArguments = loaderProfile.minecraftArguments;
+          versionData.arguments = null; // Forzar uso de minecraftArguments en Rust
+          console.log(`[Launcher] ✓ Usando minecraftArguments de ${instance.loader} (anuló arguments de vanilla)`);
+        } else if (loaderProfile.arguments) {
+          // Loader usa formato moderno (array) — reemplaza el de vanilla
+          versionData.arguments = loaderProfile.arguments;
+          console.log(`[Launcher] ✓ Usando arguments de ${instance.loader} (formato moderno)`);
+        }
+
+        // CRÍTICO: Agregar librerías del loader (ej: ForgeWrapper, securejarhandler, etc.)
+        // Estas librerías son necesarias para que ForgeWrapper funcione
+        if (loaderProfile.libraries && Array.isArray(loaderProfile.libraries)) {
+          console.log(`[Launcher] Agregando ${loaderProfile.libraries.length} librerías del loader al classpath`);
+          versionData.libraries = [...(versionData.libraries || []), ...loaderProfile.libraries];
+        }
+
+        // CRÍTICO PARA LOADERS CON INSTALADOR (Forge, NeoForge): Reparar/descargar instalador
+        // IMPORTANTE: Construye javaArgsForLaunch temporal, NO modifica instance.javaArgs del store
+        if ((instance.loader === 'forge' || instance.loader === 'neoforge') && instance.loaderVersion) {
+          console.log(`[Launcher] FASE 3.6: Reparación de instalador de ${instance.loader}...`);
+          try {
+            const installerPath = await getLoaderInstallerPath(instance, launcherDir, onRepairProgress);
+
+            if (installerPath) {
+              console.log(`[Launcher] ✓ Instalador de ${instance.loader} listo: ${installerPath}`);
+
+              // Ruta del client JAR de Minecraft — ForgeWrapper necesita -Dforgewrapper.minecraft
+              const minecraftJarPath = `${launcherDir}/libraries/net/minecraft/client/${instance.version}/client-${instance.version}.jar`;
+
+              // Construir argumentos en variable TEMPORAL (sin modificar el store)
+              // ForgeWrapper requiere AMBAS propiedades del sistema:
+              //   -Dforgewrapper.installer  → el JAR del instalador de Forge
+              //   -Dforgewrapper.minecraft  → el client.jar de Minecraft vanilla
+              const forgeWrapperArgs = [
+                `-Dforgewrapper.installer=${installerPath}`,
+                `-Dforgewrapper.minecraft=${minecraftJarPath}`,
+              ].join(' ');
+
+              javaArgsForLaunch = `${forgeWrapperArgs} ${javaArgsForLaunch}`.trim();
+              console.log(`[Launcher] ✓ ForgeWrapper args agregados a JVM (no se guarda en store):`);
+              console.log(`[Launcher]   installer: ${installerPath}`);
+              console.log(`[Launcher]   minecraft: ${minecraftJarPath}`);
+            } else {
+              throw new Error('No se pudo obtener ruta del instalador');
+            }
+          } catch (err) {
+            console.error(`[Launcher] ✗ Error al reparar instalador de ${instance.loader}: ${err.message}`);
+            throw new Error(`No se pudo preparar instalador de ${instance.loader}: ${err.message}`);
+          }
+        }
+      } catch (err) {
+        // Los errores del instalador de Forge/NeoForge son fatales — sin instalador no puede arrancar
+        if (instance.loader === 'forge' || instance.loader === 'neoforge') {
+          throw err;
+        }
+        // Para Fabric/Quilt un perfil faltante es degradación a vanilla (no ideal pero no fatal)
+        console.warn(`[Launcher] ⚠️ No se pudo cargar perfil de ${instance.loader}: ${err.message}`);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FASE 4: Aplicar skins (best-effort, no bloquea)
+    // ─────────────────────────────────────────────────────────────────────────
+    console.log(`[Launcher] FASE 4: Aplicando skins...`);
     try {
       await applySkinToInstance(instance, profile, launcherDir);
     } catch (err) {
       console.warn('[Launcher] Error aplicando skin:', err.message);
     }
 
-    // Cargar perfil del loader si aplica
-    let effectiveVersionData = versionData;
-    let extraJvmArgs = [];
-    let classpathVersionId = instance.version; // por defecto usa versión vanilla
-    const profileId = getLoaderProfileId(instance);
-    if (profileId) {
-      try {
-        const profilePath = `${launcherDir}/versions/${profileId}/${profileId}.json`;
-        const profileJson = await readFile(profilePath);
-        const loaderProfile = JSON.parse(profileJson);
-        console.log(`[Launcher] Perfil del loader cargado: ${profileId} (mainClass: ${loaderProfile.mainClass})`);
+    // ─────────────────────────────────────────────────────────────────────────
+    // FASE 5: DELEGACIÓN A RUST
+    // Toda la lógica pesada de preparación se ejecuta en Rust para mejor perf
+    // ─────────────────────────────────────────────────────────────────────────
+    console.log(`[Launcher] FASE 5: Preparación de lanzamiento (en Rust)...`);
+    console.log(`[Launcher] Preparando LaunchConfig...`);
 
-        // El client JAR viene del perfil heredado (inheritsFrom), no del loader profile
-        const inheritedId = loaderProfile.inheritsFrom || instance.version;
-        classpathVersionId = inheritedId;
-
-        // Extraer JVM args del perfil del loader (será resuelto después con classpath disponible)
-        const profileJvmArgs = loaderProfile.arguments?.jvm ?? [];
-        extraJvmArgs = profileJvmArgs.filter(arg => typeof arg === 'string');
-
-        if (extraJvmArgs.length > 0) {
-          console.log(`[Launcher] JVM args del loader (sin resolver):`, extraJvmArgs);
-        }
-
-        effectiveVersionData = {
-          ...versionData,
-          mainClass: loaderProfile.mainClass,
-          libraries: [
-            ...(loaderProfile.libraries ?? []),
-            ...(versionData.libraries ?? []),
-          ],
-          // Mergear arguments del loader profile (necesario para Forge tweakers)
-          arguments: loaderProfile.arguments || versionData.arguments,
-          minecraftArguments: loaderProfile.minecraftArguments || versionData.minecraftArguments,
-        };
-
-        // Si es ForgeWrapper, agregar sistema property explícito señalando al installer JAR
-        const isForgeWrapper = loaderProfile.mainClass?.includes('forgewrapper') ||
-                                loaderProfile.mainClass?.includes('ForgeWrapper');
-        if (isForgeWrapper && instance.loader === 'forge') {
-          // El profileId para Forge es el forgeVersion mismo (ej: "1.19.2-43.5.2")
-          // La ruta final sería: libraries/net/minecraftforge/forge/{version}/forge-{version}-installer.jar
-          let installerJarPath = `${launcherDir}/libraries/net/minecraftforge/forge/${profileId}/forge-${profileId}-installer.jar`;
-
-          // IMPORTANTE: Convertir backslashes a forward slashes para Windows
-          // Java/ForgeWrapper espera forward slashes incluso en Windows
-          installerJarPath = installerJarPath.replace(/\\/g, '/');
-
-          // Agregar propiedad que ForgeWrapper requiere para localizar el installer
-          // ForgeWrapper específicamente busca la propiedad -Dforgewrapper.installer
-          if (!extraJvmArgs.some(arg => arg.includes('forgewrapper.installer'))) {
-            extraJvmArgs.push(`-Dforgewrapper.installer=${installerJarPath}`);
-            console.log(`[Launcher] ✓ Agregada propiedad forgewrapper.installer=${installerJarPath}`);
-          }
-        }
-      } catch (err) {
-        console.warn(`[Launcher] No se pudo cargar perfil del loader ${profileId}:`, err.message);
-      }
-    }
-
-    // Construir args de lanzamiento
-    const launchArgs = buildLaunchArgs({
-      instance,
-      profile,
-      javaPath,
-      gameDirBase: `${launcherDir}/instances`,
-      assetsDir,
-      versionJson: effectiveVersionData,
-    });
-
-    // Construir classpath — usa classpathVersionId que ya se determinó arriba
-    const classpath = buildClasspath(effectiveVersionData, launcherDir, classpathVersionId);
-
-    // Log de diagnóstico del classpath
-    const classpathEntries = classpath.split(navigator.platform.includes('Win') ? ';' : ':');
-    console.log(`[Launcher] Classpath (${classpathEntries.length} entradas):`);
-    classpathEntries.forEach(e => console.log(`  ▸ ${e}`));
-
-    // Crear directorios de instancia
-    const base = `${launcherDir}/instances/${instance.id}`;
-    await ensureDir(`${base}/mods`);
-    await ensureDir(`${base}/config`);
-    await ensureDir(`${base}/saves`);
-    await ensureDir(`${base}/natives`);
-
-    // Resolver variables en JVM args del loader (ahora tenemos classpath disponible)
-    const nativesDir = `${launcherDir}/instances/${instance.id}/natives`;
-    const librariesDir = `${launcherDir}/libraries`;
-    const resolveLoaderArg = (arg) => arg
-      .replace(/\$\{LIBRARY_DIR\}/g, librariesDir)
-      .replace(/\$\{MINECRAFT_JAR\}/g, `${launcherDir}/versions/${classpathVersionId}/${classpathVersionId}.jar`)
-      .replace(/\$\{MINECRAFT_VERSION\}/g, instance.version)
-      .replace(/\$\{natives_directory\}/g, nativesDir)
-      .replace(/\$\{launcher_name\}/g, 'Minecrack')
-      .replace(/\$\{launcher_version\}/g, '1.0.0')
-      .replace(/\$\{clientid\}/g, '')
-      .replace(/\$\{auth_xuid\}/g, '');
-
-    // Resolver variables y filtrar args inválidos
-    const resolvedExtraJvmArgs = extraJvmArgs
-      .map(resolveLoaderArg)
-      // Filtrar argumentos inválidos como "-cp ${classpath}" que no se resuelven
-      .filter(arg => !arg.includes('${') && arg !== '-cp');
-
-    // Invocar comando de lanzamiento a Rust
-    // Deduplicar -D flags (las del loader overridean las base)
-    const jvmArgsMap = new Map();
-    const allJvmArgs = [...launchArgs.jvmArgs, ...resolvedExtraJvmArgs];
-    for (const arg of allJvmArgs) {
-      if (arg.startsWith('-D')) {
-        const key = arg.split('=')[0]; // ej: "-Djava.library.path"
-        jvmArgsMap.set(key, arg);
-      } else {
-        // Para args sin -D (como -Xmx, -XX:), permitir múltiples
-        // Usar array value para mantener orden
-        if (!jvmArgsMap.has(arg)) jvmArgsMap.set(arg, arg);
-      }
-    }
-    const dedupedJvmArgs = Array.from(jvmArgsMap.values());
-
-    const config = {
-      java_path: javaPath,
-      jvm_args: dedupedJvmArgs,
-      classpath,
-      main_class: launchArgs.mainClass,
-      game_args: launchArgs.gameArgs,
-      game_dir: launchArgs.gameDir,
+    // Construir el objeto de instancia para Rust (debe coincidir con GameInstance struct)
+    // CRÍTICO: La struct Rust usa #[serde(rename_all = "camelCase")], así que los
+    // nombres deben ser camelCase para que serde los deserialice correctamente.
+    // java_args (snake_case) → Rust lo ignora silenciosamente; "javaArgs" (camelCase) → funciona.
+    const gameInstance = {
+      id: instance.id,
+      name: instance.name,
+      version: instance.version,
+      loader: instance.loader,
+      loaderVersion: instance.loaderVersion || null,   // camelCase → loader_version en Rust
+      javaArgs: javaArgsForLaunch,                     // camelCase → java_args en Rust (incluye -Dforgewrapper.installer)
+      maxRam: instance.ram || instance.maxRam || null, // camelCase → max_ram en Rust
+      gameType: instance.gameType || null,              // camelCase → game_type en Rust
     };
 
-    // ✓ LOG CRÍTICO: Ver exactamente qué se envía a Rust
-    console.log(`[Launcher] ============ ENVIANDO CONFIGURACIÓN A RUST ============`);
-    console.log(`[Launcher] java_path: ${config.java_path}`);
-    console.log(`[Launcher] main_class: ${config.main_class}`);
-    console.log(`[Launcher] game_dir: ${config.game_dir}`);
-    console.log(`[Launcher] jvm_args (${config.jvm_args.length}): ${config.jvm_args.join(' ')}`);
-    console.log(`[Launcher] game_args (${config.game_args.length}): ${config.game_args.join(' ')}`);
-    console.log(`[Launcher] classpath chars: ${config.classpath.length}`);
-    console.log(`[Launcher] ===================================================`);
-    console.log(`[Launcher] Invocando launch_game...`);
+    // Construir el objeto de perfil para Rust (debe coincidir con GameProfile struct)
+    const gameProfile = {
+      name: profile.name || profile.username || 'Player',  // Fallback si no hay nombre
+      uuid: profile.uuid || '00000000-0000-0000-0000-000000000000',
+    };
 
-    await tauriCmd('launch_game', { config });
-    console.log(`[Launcher] launch_game completado (proceso terminado).`);
+    // Construir el objeto de datos de versión para Rust (debe coincidir con GameVersionData struct)
+    // NOTA: assetIndex.id puede diferir de la versión MC (ej: MC 1.19.2 → assetIndex "1.19")
+    const assetsIndexName = versionData.assetIndex?.id ?? versionData.assets ?? instance.version;
+    const gameVersionData = {
+      mainClass: versionData.mainClass,
+      libraries: versionData.libraries || [],
+      arguments: versionData.arguments || null,
+      minecraftArguments: versionData.minecraftArguments || null,
+      assetsIndexName,  // camelCase → assets_index_name en Rust
+    };
+    console.log(`[Launcher] Asset index: ${assetsIndexName} (MC version: ${instance.version})`);
+
+    // Llamar al comando Rust que prepara toda la configuración
+    // IMPORTANTE: Usar camelCase para los parámetros (Tauri convierte de snake_case en Rust)
+    const launchConfig = await tauriCmd('prepare_game_launch', {
+      instance: gameInstance,
+      profile: gameProfile,
+      launcherDir,  // camelCase, no snake_case
+      versionData: gameVersionData,  // camelCase, no snake_case
+      javaPath,  // Ya detectado y validado en JavaScript
+    });
+
+    console.log(`[Launcher] ✓ LaunchConfig generado en Rust`);
+    console.log(`[Launcher] MainClass: ${launchConfig.main_class}`);
+    console.log(`[Launcher] JVM Args: ${launchConfig.jvm_args.length} args`);
+    console.log(`[Launcher] Classpath: ${launchConfig.classpath.length} chars`);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FASE 6: Lanzar el juego
+    // ─────────────────────────────────────────────────────────────────────────
+    console.log(`[Launcher] FASE 6: Lanzando juego...`);
+    console.log(`[Launcher] Java: ${launchConfig.java_path}`);
+    console.log(`[Launcher] GameDir: ${launchConfig.game_dir}`);
+
+    await tauriCmd('launch_game', { config: launchConfig });
+    console.log(`[Launcher] ✓ Juego lanzado exitosamente`);
 
   } catch (error) {
-    // Tauri puede devolver un string puro (error de Rust), no siempre un Error object
     const msg = error?.message ?? (typeof error === 'string' ? error : JSON.stringify(error));
+    console.error(`[Launcher] ✗ Error: ${msg}`);
     throw new Error(`Error al lanzar el juego: ${msg}`);
   }
 }
 
-// Escucha eventos del juego (logs y salida)
+/**
+ * Event listeners for game logging and termination
+ */
 export function listenGameEvents(onLog, onStopped) {
   let unlistenLog;
   let unlistenStopped;
 
-  // tauriListen ya extrae el payload — el handler recibe el payload directamente
   tauriListen('game://log', (payload) => {
     onLog(payload);
   }).then(fn => { unlistenLog = fn; });
@@ -341,3 +522,8 @@ export function listenGameEvents(onLog, onStopped) {
     unlistenStopped?.();
   };
 }
+
+export default {
+  launchGameInstance,
+  listenGameEvents,
+};

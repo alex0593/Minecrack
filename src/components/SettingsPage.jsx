@@ -229,6 +229,7 @@ export default function SettingsPage() {
                 onChange={e => setJavaPath(e.target.value)}
                 placeholder="java  (detectar automáticamente)"
                 spellCheck={false}
+                autoComplete="off"
               />
               <button
                 className="btn btn-ghost btn-sm"
@@ -266,6 +267,7 @@ export default function SettingsPage() {
                 onChange={e => setGameDir(e.target.value)}
                 placeholder="Directorio predeterminado"
                 spellCheck={false}
+                autoComplete="off"
               />
               <button
                 className="btn btn-ghost btn-sm"
@@ -400,6 +402,7 @@ export default function SettingsPage() {
               placeholder="-XX:+UseZGC -Xss1M"
               spellCheck={false}
               style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
+              autoComplete="off"
             />
           </Field>
         </Section>

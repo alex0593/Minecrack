@@ -59,7 +59,10 @@ export default function Sidebar() {
             key={item.id}
             id={`nav-${item.id}`}
             className={`sidebar-nav-item${activeTab === item.id ? ' active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_TAB', payload: item.id })}
+            onClick={() => {
+              dispatch({ type: 'SET_TAB', payload: item.id });
+              // Keep instances list always visible
+            }}
           >
             <span className="nav-icon">{item.icon}</span>
             {item.label}

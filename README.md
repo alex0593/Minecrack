@@ -1,25 +1,24 @@
 # 🎮 Minecrack
 
-![Minecrack Version](https://img.shields.io/badge/version-1.0.0-emerald?style=for-the-badge)
+![Minecrack Version](https://img.shields.io/badge/version-1.3.0-emerald?style=for-the-badge)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202.0-blue?style=for-the-badge&logo=tauri)
 ![React](https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=for-the-badge&logo=react)
 ![Rust](https://img.shields.io/badge/Backend-Rust-black?style=for-the-badge&logo=rust)
 
-**Minecrack** es un lanzador de Minecraft de alto rendimiento y código abierto, diseñado para la gestión eficiente de múltiples instancias y la personalización extrema. Construido sobre **Tauri 2.0** y **React 19**, ofrece una experiencia nativa ligera con una interfaz moderna y oscura.
+**Minecrack** es un lanzador alternativo para Minecraft diseñado para ser rápido, ligero y muy fácil de usar. Su objetivo principal es permitirte gestionar diferentes versiones del juego, instalar mods de manera sencilla y personalizar tu experiencia al máximo, todo desde una interfaz moderna y amigable.
+
+Ya sea que quieras jugar la versión más reciente, revivir versiones clásicas o probar paquetes de mods (modpacks), Minecrack te da las herramientas para hacerlo con un par de clics.
 
 ---
 
 ## ✨ Características Principales
 
-- **🛡️ Modo Offline Nativo:** Juega sin necesidad de autenticación de Microsoft. Generación automática de perfiles y UUIDs offline compatibles.
-- **📦 Gestión de Instancias:** Crea, configura y lanza múltiples versiones de Minecraft de forma independiente.
-- **🛠️ Soporte Multicargador:** Integración completa con **Vanilla**, **Fabric**, **Quilt** y **Forge/NeoForge** (Vía Prism Meta API y resolución robusta).
-- **🌐 Navegador Unificado de Modpacks:** Explora e instala modpacks desde CurseForge y Modrinth directamente desde la interfaz.
-- **👕 Skins Automáticos offline:** Integración con CustomSkinLoader para usar skins personalizados (PNG) directamente en el launcher.
-- **🚀 Lanzamiento Optimizado:** Detección automática de JRE (Java 17+), construcción dinámica de Classpath y deduplicación de argumentos JVM.
-- **📥 Sistema de Descargas en Dos Fases:**
-  1. **Fase de Librerías:** Descarga concurrente de binarios y dependencias nativas.
-  2. **Fase de Assets:** Descarga masiva de texturas y sonidos (~3000 archivos) con verificación SHA1.
+- **🛡️ Juega a tu manera (Modo Offline):** Entra al juego rápidamente sin necesidad de una cuenta de Microsoft, ideal para jugar en redes locales con amigos.
+- **📦 Múltiples Versiones:** Crea y organiza diferentes instalaciones de Minecraft (instancias) para jugar distintas versiones sin que interfieran entre sí.
+- **🛠️ Listo para Mods:** Juega con tus mods favoritos fácilmente. Compatible con **Vanilla, Fabric, Quilt y Forge/NeoForge** de forma automática.
+- **🌐 Catálogo de Modpacks Integrado:** Busca, descubre e instala miles de modpacks directamente desde CurseForge y Modrinth sin salir de la aplicación.
+- **👕 Skins Personalizados:** Usa tus propias apariencias (skins) en el juego incluso jugando sin conexión.
+- **🚀 Rápido y Optimizado:** Descargas veloces y configuración automática (como la detección de Java) para que entres a jugar lo antes posible sin lidiar con configuraciones complejas.
 
 ---
 
@@ -88,15 +87,6 @@ Minecrack/
 
 ---
 
-## 🏗️ Arquitectura de Lanzamiento
-
-El flujo de lanzamiento de una instancia sigue estos pasos críticos:
-1. **Detección de Java:** Se escanea el sistema en busca de una versión compatible.
-2. **Resolución de Variables:** Se procesan placeholders como `${natives_directory}` y `${launcher_name}`.
-3. **Classpath Building:** Se genera la cadena de librerías necesaria según la versión y el cargador de mods.
-4. **Subprocess Spawn:** El backend de Rust inicia la JVM, capturando los logs para mostrarlos en la consola del launcher vía eventos.
-
----
 
 ## 📚 Documentación de Desarrollo
 

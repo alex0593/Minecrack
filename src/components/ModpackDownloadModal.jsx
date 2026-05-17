@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react';
-import { useStore } from '../store';
+import { useDispatch } from '../store';
 import {
   searchModpacks,
   getModpackWithVersions,
@@ -35,7 +35,7 @@ import ErrorModal from './ui/ErrorModal';
 import './ModpackDownloadModal.css';
 
 export default function ModpackDownloadModal({ onClose }) {
-  const { dispatch } = useStore();
+  const { dispatch } = useDispatch();
 
   // Estados del flujo
   const [step, setStep] = useState('search'); // search | loading | selecting | previewing | downloading | installing-mods | done | error

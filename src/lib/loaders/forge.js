@@ -2,6 +2,7 @@
 import { API } from '../../config';
 import { ensureDir, writeFile } from '../tauri';
 import { getPrismForgeVersionData } from '../prism';
+import { mavenNameToPath } from './maven-utils';
 
 /**
  * Obtiene las versiones disponibles de Forge para una versión de Minecraft
@@ -151,24 +152,6 @@ export async function findCompatibleForgeVersion(gameVersion) {
  * @param {object|null} prismData  - Datos de Prism Meta para esta versión (puede ser null)
  * @returns {object} JSON del perfil de Forge compatible con el launcher
  */
-// Convierte "group:artifact:version" o "group:artifact:version:classifier" al path Maven relativo
-// Ejemplos:
-//   org.ow2.asm:asm:9.9 → org/ow2/asm/asm/9.9/asm-9.9.jar
-//   net.minecraftforge:forge:1.19.2-43.2.14:installer → net/minecraftforge/forge/1.19.2-43.2.14/forge-1.19.2-43.2.14-installer.jar
-function nameToMavenPath(name) {
-  const parts = name.split(':');
-  if (parts.length < 3) return null;
-
-  const [group, artifact, version, classifier] = parts;
-  const groupPath = group.replace(/\./g, '/');
-
-  // Si hay clasificador, incluirlo en el nombre del JAR
-  if (classifier) {
-    return `${groupPath}/${artifact}/${version}/${artifact}-${version}-${classifier}.jar`;
-  } else {
-    return `${groupPath}/${artifact}/${version}/${artifact}-${version}.jar`;
-  }
-}
 
 export function generateForgeProfile(versionData, forgeVersion, prismData = null) {
   // ── Con datos de Prism Meta (camino correcto) ────────────────────────────
@@ -180,7 +163,7 @@ export function generateForgeProfile(versionData, forgeVersion, prismData = null
       const a = entry.downloads?.artifact;
       if (!a?.url) return null;
       if (!a.path && entry.name) {
-        const derived = nameToMavenPath(entry.name);
+        const derived = mavenNameToPath(entry.name);
         if (derived) return { ...entry, downloads: { ...entry.downloads, artifact: { ...a, path: derived } } };
       }
       return a.path ? entry : null;
@@ -308,7 +291,7 @@ export function getForgeDownloadTasks(forgeVersion, launcherDir, forgeProfile) {
     if (!artifact?.url) return;
 
     // Derive path from name when absent (Prism Meta sometimes omits it)
-    const libPath = artifact.path ?? (entry.name ? nameToMavenPath(entry.name) : null);
+    const libPath = artifact.path ?? (entry.name ? mavenNameToPath(entry.name) : null);
     if (!libPath) return;
 
     tasks.push({

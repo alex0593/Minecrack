@@ -97,7 +97,7 @@ export default function NewInstanceModal() {
 
   return (
     <div className="overlay" onClick={closeModal}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
+      <div className="modal modal--md" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>

@@ -58,7 +58,7 @@ export default function InstanceSettingsModal({ instanceId, onClose }) {
 
   return (
     <div className="isettings-overlay" onClick={onClose}>
-      <div className="isettings-modal" onClick={e => e.stopPropagation()}>
+      <div className="isettings-modal modal modal--sm" onClick={e => e.stopPropagation()}>
 
         <div className="isettings-header">
           <h2>⚙ Configuración — {instance.name}</h2>
@@ -167,7 +167,7 @@ export default function InstanceSettingsModal({ instanceId, onClose }) {
           </div>
         </div>
 
-        <div className="isettings-footer">
+        <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button
             className="btn btn-primary"

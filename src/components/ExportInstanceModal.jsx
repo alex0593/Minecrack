@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { exportInstance, getLauncherDir, pickFolder } from '../lib/tauri';
-import { useStore } from '../store';
 import ProgressBar from './ui/ProgressBar';
 import ErrorModal from './ui/ErrorModal';
 import './ExportInstanceModal.css';

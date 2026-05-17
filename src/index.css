@@ -110,6 +110,38 @@
   /* Transitions */
   --transition: 0.18s ease;
   --transition-slow: 0.3s ease;
+
+  /* ─── P2 Design System Tokens ────────────────────────────────────────────── */
+
+  /* Font Size Scale (derived from current button sizes for 1:1 P3 adoption) */
+  --fs-xs:   11px;
+  --fs-sm:   12px;
+  --fs-md:   13px;
+  --fs-lg:   15px;
+  --fs-xl:   18px;
+  --fs-2xl:  22px;
+
+  /* Z-Index Scale (organized layers from base to toast/error) */
+  --z-base:      1;
+  --z-dropdown:  10;
+  --z-sticky:    50;
+  --z-overlay:   100;
+  --z-modal:     200;
+  --z-toast:     300;
+  --z-error:     9999;
+
+  /* Modal Width Tiers */
+  --modal-sm:  480px;
+  --modal-md:  600px;
+  --modal-lg:  720px;
+  --modal-xl:  960px;
+
+  /* Button Sizing (for consistent density) */
+  --btn-xs-pad: 5px 10px;
+  --btn-xs-fs:  var(--fs-sm);
+
+  /* Sidebar responsive */
+  --sidebar-w: 260px;
 }
 
 /* --- Reset --- */
@@ -870,4 +902,144 @@ p  { color: var(--text-secondary); }
 [data-theme="light"] .badge-installed {
   background: rgba(0,200,83,0.15);
   color: #007030;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   P2: DESIGN SYSTEM REUSABLE CLASSES
+   These classes promote patterns from one-off components to shared patterns.
+   Zero visual change — additive CSS only. No component edits in P2.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Modal Footer (unified across all modals) ──────────────────────────────── */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--gap-sm);
+  padding-top: var(--gap-md);
+  border-top: 1px solid var(--border);
+  margin-top: var(--gap-md);
+}
+.modal-footer--spread {
+  justify-content: space-between;
+}
+
+/* ─── Button Block (full-width button) ────────────────────────────────────────── */
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ─── Success State (icon + message centered) ────────────────────────────────── */
+.success-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--gap-md);
+  padding: var(--gap-xl);
+  min-height: 200px;
+}
+.success-state-icon {
+  font-size: 48px;
+  opacity: 0.8;
+}
+.success-state-title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.success-state-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  max-width: 320px;
+}
+
+/* ─── Form Field (labeled input group) ─────────────────────────────────────── */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-xs);
+}
+.form-field label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.form-field input,
+.form-field textarea,
+.form-field select {
+  padding: var(--gap-sm) var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-family: var(--font-sans);
+  transition: border-color var(--transition);
+}
+.form-field input:focus,
+.form-field textarea:focus,
+.form-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ─── Step Indicator (for wizards / multi-step processes) ──────────────────── */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-md);
+  padding: var(--gap-lg) 0;
+}
+.step-dot {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  border: 2px solid var(--border);
+  transition: all var(--transition);
+  cursor: default;
+}
+.step-dot.--active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow-strong);
+}
+.step-dot.--completed {
+  background: var(--accent-dim);
+  color: #000;
+  border-color: var(--accent-dim);
+}
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  max-width: 60px;
+}
+.step-line.--active {
+  background: var(--accent);
+}
+
+/* ─── Modal Width Tiers (for consistent modal sizing) ───────────────────────── */
+.modal--sm  { max-width: var(--modal-sm); }
+.modal--md  { max-width: var(--modal-md); }
+.modal--lg  { max-width: var(--modal-lg); }
+.modal--xl  { max-width: var(--modal-xl); }
+
+/* ─── Responsive Sidebar Width ─────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-w: 240px;
+  }
 }

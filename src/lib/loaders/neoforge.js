@@ -2,6 +2,7 @@
 import { API } from '../../config';
 import { ensureDir, writeFile } from '../tauri';
 import { getPrismNeoForgeVersions, getPrismNeoForgeVersionData } from '../prism';
+import { mavenNameToPath } from './maven-utils';
 
 /**
  * Versiones de NeoForge conocidas con disponibilidad confirmada.
@@ -39,17 +40,6 @@ export async function getNeoForgeVersions(gameVersion) {
   }
 }
 
-// Convierte "group:artifact:version[:classifier]" al path Maven relativo
-function nameToMavenPath(name) {
-  const parts = name.split(':');
-  if (parts.length < 3) return null;
-  const [group, artifact, version, classifier] = parts;
-  const groupPath = group.replace(/\./g, '/');
-  if (classifier) {
-    return `${groupPath}/${artifact}/${version}/${artifact}-${version}-${classifier}.jar`;
-  }
-  return `${groupPath}/${artifact}/${version}/${artifact}-${version}.jar`;
-}
 
 /**
  * Genera el JSON de perfil NeoForge usando los datos de Prism Meta.
@@ -72,7 +62,7 @@ export function generateNeoForgeProfile(versionData, neoforgeVersion, gameVersio
       const a = entry.downloads?.artifact;
       if (!a?.url) return null;
       if (!a.path && entry.name) {
-        const derived = nameToMavenPath(entry.name);
+        const derived = mavenNameToPath(entry.name);
         if (derived) return { ...entry, downloads: { ...entry.downloads, artifact: { ...a, path: derived } } };
       }
       return a.path ? entry : null;

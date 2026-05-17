@@ -99,7 +99,7 @@ export default function VerifyInstanceModal({ instanceId, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content verify-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal--md modal-content verify-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
             <h2>Verificar / Reparar</h2>
@@ -258,7 +258,7 @@ export default function VerifyInstanceModal({ instanceId, onClose }) {
             )}
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+            <div className="modal-footer modal-footer--spread">
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={handleVerify}
@@ -275,7 +275,6 @@ export default function VerifyInstanceModal({ instanceId, onClose }) {
                   🔧 Reparar ({verification.missing.length + verification.corrupt.length})
                 </button>
               )}
-              <div style={{ flex: 1 }} />
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={onClose}

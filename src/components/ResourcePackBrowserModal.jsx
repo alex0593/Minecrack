@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useStore } from '../store';
+import { useStoreState, useDispatch } from '../store';
 import { searchResourcePacks as searchModrinthPacks, getProjectVersions, getProject } from '../lib/api/modrinth';
 import { searchResourcePacks as searchCFPacks, getMod, getModFiles } from '../lib/api/curseforge';
 import { downloadResourcePack, getLauncherDir, listResourcePacks, tauriListen } from '../lib/tauri';
@@ -35,7 +35,7 @@ function PackCard({ pack, selected, onClick }) {
 function PackDetail({ pack, instance, source, onInstalled }) {
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState(null);
-  const { dispatch } = useStore();
+  const { dispatch } = useDispatch();
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -162,7 +162,7 @@ function PackDetail({ pack, instance, source, onInstalled }) {
 }
 
 export default function ResourcePackBrowserModal({ instanceId, onClose }) {
-  const { state } = useStore();
+  const state = useStoreState();
   const instance = state.instances.find(i => i.id === instanceId);
 
   const [query, setQuery] = useState('');

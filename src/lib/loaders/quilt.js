@@ -2,6 +2,7 @@
 import { API } from '../../config';
 import { ensureDir, writeFile } from '../tauri';
 import { getPrismQuiltVersions, getPrismQuiltVersionData } from '../prism';
+import { normalizeLoaderLibraries } from './maven-utils';
 
 /**
  * Obtiene las versiones disponibles de Quilt Loader
@@ -38,43 +39,10 @@ export async function getQuiltVersions(gameVersion) {
  * @param {object} installerInfo - Info del instalador de Quilt (incluye todas las libs)
  * @returns {object} JSON del perfil de Quilt
  */
-function mavenNameToPath(name) {
-  const parts = name.split(':');
-  if (parts.length < 3) return null;
-  const [group, artifact, version, classifier] = parts;
-  const groupPath = group.replace(/\./g, '/');
-  const jarName = classifier
-    ? `${artifact}-${version}-${classifier}.jar`
-    : `${artifact}-${version}.jar`;
-  return `${groupPath}/${artifact}/${version}/${jarName}`;
-}
-
-function normalizeQuiltLibraries(libs = []) {
-  return libs.map(lib => {
-    if (lib.downloads?.artifact?.path) return lib;
-    if (lib.name && lib.url !== undefined) {
-      const path = mavenNameToPath(lib.name);
-      if (!path) return lib;
-      const baseUrl = lib.url.endsWith('/') ? lib.url : lib.url + '/';
-      return {
-        name: lib.name,
-        downloads: {
-          artifact: {
-            path,
-            url: baseUrl + path,
-            sha1: lib.sha1 || '',
-            size: lib.size || 0,
-          },
-        },
-      };
-    }
-    return lib;
-  }).filter(lib => lib.downloads?.artifact?.path);
-}
 
 export function generateQuiltProfile(versionData, quiltVersion, gameVersion, installerInfo = null) {
   const rawLibs = installerInfo?.libraries || [];
-  const libraries = normalizeQuiltLibraries(rawLibs);
+  const libraries = normalizeLoaderLibraries(rawLibs);
 
   const profile = {
     id: `${gameVersion}-quilt-${quiltVersion}`,

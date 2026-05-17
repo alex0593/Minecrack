@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useStore } from '../store';
+import { useStoreState, useDispatch } from '../store';
 import { searchShaderpacks as searchModrinthShaders, getProjectVersions } from '../lib/api/modrinth';
 import { searchShaderpacks as searchCFShaders, getModFiles } from '../lib/api/curseforge';
 import { downloadShaderPack, getLauncherDir, listShaderPacks, tauriListen } from '../lib/tauri';
@@ -35,7 +35,7 @@ function ShaderCard({ shader, selected, onClick }) {
 function ShaderDetail({ shader, instance, source, onInstalled }) {
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState(null);
-  const { dispatch } = useStore();
+  const { dispatch } = useDispatch();
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -162,7 +162,7 @@ function ShaderDetail({ shader, instance, source, onInstalled }) {
 }
 
 export default function ShaderPackBrowserModal({ instanceId, onClose }) {
-  const { state } = useStore();
+  const state = useStoreState();
   const instance = state.instances.find(i => i.id === instanceId);
 
   const [query, setQuery] = useState('');

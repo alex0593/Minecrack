@@ -3,7 +3,7 @@ import { pickFile, pickFolder, inspectInstanceZip, inspectInstanceFolder,
          importInstanceFromZip, importInstanceFromFolder, getLauncherDir,
          getModsToDownload, tauriListen } from '../lib/tauri';
 import { installVersion, installAssets } from '../lib/downloader';
-import { useStore } from '../store';
+import { useDispatch } from '../store';
 import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
 import './ImportInstanceModal.css';
 
@@ -52,7 +52,7 @@ function ProgressRow({ label, sub, value }) {
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
 export default function ImportInstanceModal({ onClose }) {
-  const { dispatch } = useStore();
+  const { dispatch } = useDispatch();
 
   // Estado de la máquina
   const [phase, setPhase] = useState('idle');

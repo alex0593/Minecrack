@@ -1,9 +1,15 @@
-/* App Layout */
+/* App Layout — P3 foundation wiring: use design system tokens */
 .app-layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
   grid-template-rows: 38px 1fr;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+  .app-layout {
+    grid-template-columns: var(--sidebar-w) 1fr;
+  }
 }

@@ -16,16 +16,27 @@ import { API } from '../config';
 
 const BASE = API.PRISM.BASE;
 
-// ─── Cache en memoria ─────────────────────────────────────────────────────────
+// ─── Cache en memoria con TTL ────────────────────────────────────────────────────
 const _cache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
 /**
  * Fetch con retry y backoff exponencial.
  * Reintenta solo errores transitorios: 5xx, timeouts (AbortError), network errors.
  * 4xx pasa de largo (404 no se reintenta — fail fast).
+ * Cache tiene TTL de ~5 minutos para evitar datos stale en sesiones largas.
  */
 async function fetchPrism(url, attempt = 0) {
-  if (_cache.has(url)) return _cache.get(url);
+  // Verificar cache con TTL
+  if (_cache.has(url)) {
+    const cached = _cache.get(url);
+    const age = Date.now() - cached.timestamp;
+    if (age < CACHE_TTL_MS) {
+      return cached.data;
+    }
+    // TTL expirado, limpiar entrada
+    _cache.delete(url);
+  }
 
   const MAX_ATTEMPTS = 3;
   const TIMEOUT_MS = 8000;
@@ -48,7 +59,7 @@ async function fetchPrism(url, attempt = 0) {
     }
 
     const data = await res.json();
-    _cache.set(url, data);
+    _cache.set(url, { data, timestamp: Date.now() });
     return data;
   } catch (err) {
     clearTimeout(timeout);

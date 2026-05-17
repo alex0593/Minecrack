@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useStore } from '../store';
+import { useDispatch } from '../store';
 import {
   getModpackWithVersions,
   getModpackDownloadUrl,
@@ -31,7 +31,7 @@ import ProgressBar from './ui/ProgressBar';
 import './ModpackDownloadModal.css';
 
 export default function ModpackInstallModal({ source, pack, onClose }) {
-  const { dispatch, openModal } = useStore();
+  const { dispatch, openModal } = useDispatch();
 
   const [step, setStep] = useState('loading'); // loading | previewing | downloading | installing-mods | done | error
   const [versions, setVersions] = useState([]);

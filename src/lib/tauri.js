@@ -12,6 +12,33 @@
 
 const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
+// ─── Cached Tauri module imports (P1.2 optimization) ───────────────────────────
+// Load invoke and listen once, cache them to avoid per-call async import() calls.
+let tauri_invoke_promise = null;
+let tauri_listen_promise = null;
+
+function getTauriInvoke() {
+  if (!IS_TAURI) return null;
+  if (!tauri_invoke_promise) {
+    tauri_invoke_promise = import('@tauri-apps/api/core').then(m => m.invoke).catch(err => {
+      console.warn('[tauri] Failed to load invoke:', err?.message || err);
+      return null;
+    });
+  }
+  return tauri_invoke_promise;
+}
+
+function getTauriListen() {
+  if (!IS_TAURI) return null;
+  if (!tauri_listen_promise) {
+    tauri_listen_promise = import('@tauri-apps/api/event').then(m => m.listen).catch(err => {
+      console.warn('[tauri] Failed to load listen:', err?.message || err);
+      return null;
+    });
+  }
+  return tauri_listen_promise;
+}
+
 // Datos de referencia para desarrollo (mocks reales basados en ZIPs de ejemplo)
 const DEV_REFERENCE_DATA = {
   '/mock/path/file.zip': { // Para pickFile genérico
@@ -223,7 +250,11 @@ export async function tauriCmd(command, args = {}) {
     return mockCommand(command, args);
   }
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
+    const invoke = await getTauriInvoke();
+    if (!invoke) {
+      console.warn(`[tauri] invoke not available, falling back to mock for command: ${command}`);
+      return mockCommand(command, args);
+    }
     console.log(`[tauri] Invoking command: ${command}`, args);
     const result = await invoke(command, args);
     console.log(`[tauri] Command ${command} result:`, result);
@@ -241,7 +272,11 @@ export async function tauriListen(event, handler) {
     console.warn(`[mock] tauriListen("${event}")`);
     return () => {}; // unlisten noop
   }
-  const { listen } = await import('@tauri-apps/api/event');
+  const listen = await getTauriListen();
+  if (!listen) {
+    console.warn(`[tauri] listen not available for event: ${event}`);
+    return () => {}; // noop
+  }
   return listen(event, (e) => handler(e.payload));
 }
 
@@ -374,6 +409,20 @@ export const inspectModsZip = (srcZip) =>
 export const extractZip = (zipPath, destDir) =>
   tauriCmd('extract_zip', { zipPath, destDir });
 
+// Cached dialog module import
+let tauri_dialog_promise = null;
+
+function getTauriDialog() {
+  if (!IS_TAURI) return null;
+  if (!tauri_dialog_promise) {
+    tauri_dialog_promise = import('@tauri-apps/plugin-dialog').then(m => m.open).catch(err => {
+      console.warn('[tauri] Failed to load dialog:', err?.message || err);
+      return null;
+    });
+  }
+  return tauri_dialog_promise;
+}
+
 /**
  * Abre un diálogo nativo para seleccionar un archivo.
  * @returns {Promise<string|null>} Ruta seleccionada o null si canceló
@@ -381,7 +430,11 @@ export const extractZip = (zipPath, destDir) =>
 export async function pickFile({ title = 'Seleccionar archivo', filters } = {}) {
   if (!IS_TAURI) return '/mock/path/java';
   try {
-    const { open } = await import('@tauri-apps/plugin-dialog');
+    const open = await getTauriDialog();
+    if (!open) {
+      console.warn('[pickFile] Dialog module not available');
+      return '/mock/path/file.zip';
+    }
     const path = await open({ multiple: false, directory: false, title, filters });
     console.log(`[pickFile] Selected: ${path}`);
     return path;
@@ -398,7 +451,11 @@ export async function pickFile({ title = 'Seleccionar archivo', filters } = {}) 
 export async function pickFolder({ title = 'Seleccionar carpeta' } = {}) {
   if (!IS_TAURI) return '/mock/path/folder';
   try {
-    const { open } = await import('@tauri-apps/plugin-dialog');
+    const open = await getTauriDialog();
+    if (!open) {
+      console.warn('[pickFolder] Dialog module not available');
+      return '/mock/path/folder';
+    }
     const path = await open({ multiple: false, directory: true, title });
     console.log(`[pickFolder] Selected: ${path}`);
     return path;

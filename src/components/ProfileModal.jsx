@@ -124,7 +124,7 @@ export default function ProfileModal() {
 
   return (
     <div className="overlay" onClick={closeModal}>
-      <div className="modal profile-modal" onClick={e => e.stopPropagation()}>
+      <div className="modal modal--md profile-modal" onClick={e => e.stopPropagation()}>
 
         {/* ── Header ─────────────────────────────────────── */}
         <div className="profile-modal-header">
@@ -337,7 +337,7 @@ export default function ProfileModal() {
         )}
 
         {/* ── Actions ────────────────────────────────────── */}
-        <div className="profile-modal-actions">
+        <div className="modal-footer">
           <button className="btn btn-ghost" onClick={closeModal}>Cancelar</button>
           <button
             className="btn btn-primary"

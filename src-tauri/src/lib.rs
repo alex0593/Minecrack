@@ -1785,6 +1785,16 @@ async fn create_dir_all(path: String) -> Result<(), String> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// COMANDO: remove_dir — elimina un directorio y todo su contenido
+// ─────────────────────────────────────────────────────────────────────────────
+#[tauri::command]
+async fn remove_dir(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() { return Ok(()); }
+    std::fs::remove_dir_all(&p).map_err(|e| e.to_string())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Fix 4: Resource Packs y Shaderpacks
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2576,6 +2586,7 @@ pub fn run() {
             verify_instance,
             get_repair_tasks,
             extract_zip,
+            remove_dir,
             // Fix 4: Resource packs & Shaderpacks
             list_resourcepacks,
             add_resourcepack,

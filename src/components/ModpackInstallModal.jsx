@@ -25,6 +25,7 @@ import {
   inspectInstanceFolder,
   importInstanceFromFolder,
   getModsToDownload,
+  removeDir,
 } from '../lib/tauri';
 import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
 import ProgressBar from './ui/ProgressBar';
@@ -102,43 +103,50 @@ export default function ModpackInstallModal({ source, pack, onClose }) {
     const tempDir = `${dir}/temp-modpack-${Date.now()}`;
     await extractZip(zipPath, tempDir);
 
-    setProgress(50);
-    setProgressLabel('Importando instancia…');
-    const preview = await inspectInstanceFolder(tempDir);
-    const importResult = await importInstanceFromFolder(dir, tempDir, pack.name);
+    try {
+      setProgress(50);
+      setProgressLabel('Importando instancia…');
+      const preview = await inspectInstanceFolder(tempDir);
+      const importResult = await importInstanceFromFolder(dir, tempDir, pack.name);
 
-    dispatch({
-      type: 'ADD_INSTANCE',
-      payload: {
-        id: importResult.newInstanceId,
-        name: pack.name,
-        version: preview?.version || '1.20.1',
-        loader: preview?.loader || 'forge',
-        loaderVersion: importResult.loaderVersion || preview?.loaderVersion || null,
-        icon: '📦',
-        ram: 2048,
-        jvmArgs: '',
-        installed: false,
-        lastPlayed: null,
-        modsCount: preview?.modsCount || 0,
-      },
-    });
-
-    setProgress(70);
-    setProgressLabel('Obteniendo lista de mods…');
-    const mods = await getModsToDownload(tempDir);
-    setModsTotal(mods?.length || 0);
-
-    if (mods?.length > 0) {
-      setStep('installing-mods');
-      await downloadMultipleModsFromCurseForge(dir, importResult.newInstanceId, mods, (info) => {
-        if (info.status === 'progress') {
-          setModsDone(info.downloaded || 0);
-          setModsFailed(info.failed || 0);
-          setProgress(70 + Math.round((info.done / info.total) * 30));
-          setProgressLabel(`Descargando mods (${info.done}/${info.total}): ${info.label || ''}`);
-        }
+      dispatch({
+        type: 'ADD_INSTANCE',
+        payload: {
+          id: importResult.newInstanceId,
+          name: pack.name,
+          version: preview?.version || '1.20.1',
+          loader: preview?.loader || 'forge',
+          loaderVersion: importResult.loaderVersion || preview?.loaderVersion || null,
+          icon: '📦',
+          ram: 2048,
+          jvmArgs: '',
+          installed: false,
+          lastPlayed: null,
+          modsCount: preview?.modsCount || 0,
+        },
       });
+
+      setProgress(70);
+      setProgressLabel('Obteniendo lista de mods…');
+      const mods = await getModsToDownload(tempDir);
+      const modsCount = mods?.length || 0;
+      setModsTotal(modsCount);
+
+      if (modsCount > 0) {
+        setStep('installing-mods');
+        await downloadMultipleModsFromCurseForge(dir, importResult.newInstanceId, mods, (info) => {
+          if (info.status === 'progress') {
+            setModsDone(info.downloaded || 0);
+            setModsFailed(info.failed || 0);
+            setProgress(70 + Math.round((info.done / modsCount) * 28));
+            setProgressLabel(`Descargando mod ${info.done}/${modsCount}: ${info.label || ''}`);
+          }
+        });
+      }
+
+      dispatch({ type: 'UPDATE_INSTANCE', payload: { id: importResult.newInstanceId, installed: true } });
+    } finally {
+      try { await removeDir(tempDir); } catch {}
     }
 
     setProgress(100);

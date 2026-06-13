@@ -20,10 +20,33 @@ const LOG_PREFIX = '[CF-Download]';
  * Formato: https://mediafilez.forgecdn.net/files/{fileId/1000}/{fileId%1000}/{filename}
  */
 function buildDirectDownloadUrl(fileId, fileName) {
-  const idStr = String(fileId);
-  const part1 = idStr.substring(0, 4);
-  const part2 = String(parseInt(idStr.substring(4)) || 0);
+  const part1 = Math.floor(fileId / 1000);
+  const part2 = fileId % 1000;
   return `https://mediafilez.forgecdn.net/files/${part1}/${part2}/${encodeURIComponent(fileName)}`;
+}
+
+/**
+ * Resuelve la URL de descarga de un mod con fallback a URL directa.
+ * Reintenta la resolución API en caso de fallo.
+ */
+async function resolveDownloadUrl(projectID, fileID, fallbackFileName) {
+  try {
+    const fileInfo = await getFile(projectID, fileID);
+    const url = fileInfo?.downloadUrl;
+    const fileName = fileInfo?.fileName || fallbackFileName;
+    if (url && url !== 'null' && url !== null) {
+      return { url, fileName, sha1: extractSha1(fileInfo) };
+    }
+    // API respondió pero sin URL directa → construir CDN URL
+    return { url: buildDirectDownloadUrl(fileID, fileName), fileName, sha1: extractSha1(fileInfo) };
+  } catch {
+    // Error de red/API → intentar CDN directo
+    return {
+      url: buildDirectDownloadUrl(fileID, fallbackFileName),
+      fileName: fallbackFileName,
+      sha1: null,
+    };
+  }
 }
 
 /**
@@ -64,53 +87,29 @@ export async function downloadMultipleModsFromCurseForge(
   const failedResolution = [];
 
   for (const mod of mods) {
+    const fallbackName = mod.name ? `${mod.name}.jar` : `mod-${mod.fileID}.jar`;
     const modLabel = mod.name || `Mod ${mod.projectID}/${mod.fileID}`;
-    try {
-      onProgress?.({
-        done: tasks.length,
-        total,
-        label: `Obteniendo URL: ${modLabel}`,
-        percent: (tasks.length / total) * 10, // 0-10% para resolución
-        downloaded: 0,
-        failed: failedResolution.length,
-        status: 'resolving',
-      });
 
-      // Obtener info del archivo desde la API
-      const fileInfo = await getFile(mod.projectID, mod.fileID);
+    onProgress?.({
+      done: tasks.length,
+      total,
+      label: `Obteniendo URL: ${modLabel}`,
+      percent: (tasks.length / total) * 10,
+      downloaded: 0,
+      failed: failedResolution.length,
+      status: 'resolving',
+    });
 
-      let downloadUrl = fileInfo?.downloadUrl;
-      const fileName = fileInfo?.fileName || `mod-${mod.fileID}.jar`;
+    const resolved = await resolveDownloadUrl(mod.projectID, mod.fileID, fallbackName);
+    const task = {
+      url: resolved.url,
+      dest: `${modsDir}/${resolved.fileName}`,
+      sha1: resolved.sha1 || null,
+      label: mod.name || resolved.fileName.replace(/\.[^.]+$/, ''),
+    };
 
-      // Si la API no devuelve URL directa, construirla manualmente
-      if (!downloadUrl || downloadUrl === 'null' || downloadUrl === null) {
-        console.warn(`${LOG_PREFIX} Sin URL directa para ${modLabel}, usando URL alternativa`);
-        downloadUrl = buildDirectDownloadUrl(mod.fileID, fileName);
-      }
-
-      const sha1 = extractSha1(fileInfo);
-      const task = {
-        url: downloadUrl,
-        dest: `${modsDir}/${fileName}`,
-        sha1: sha1 || null,
-        label: mod.name || fileName.replace(/\.[^.]+$/, ''),
-      };
-
-      tasks.push(task);
-      taskMeta.set(task, { projectID: mod.projectID, fileID: mod.fileID, fileName });
-      console.log(`${LOG_PREFIX} ✓ URL resuelta: ${fileName}`);
-
-    } catch (err) {
-      console.error(`${LOG_PREFIX} Error resolviendo URL para ${modLabel}:`, err.message);
-      failedResolution.push({ projectID: mod.projectID, fileID: mod.fileID, error: err.message });
-      results.push({
-        success: false,
-        projectID: mod.projectID,
-        fileID: mod.fileID,
-        modName: modLabel,
-        error: err.message,
-      });
-    }
+    tasks.push(task);
+    taskMeta.set(task, { projectID: mod.projectID, fileID: mod.fileID, fileName: resolved.fileName });
   }
 
   if (tasks.length === 0) {
@@ -119,64 +118,86 @@ export async function downloadMultipleModsFromCurseForge(
   }
 
   // ── Descargar con cola paralela (máx 4 concurrentes) ────────────────────
-  let downloaded = failedResolution.length; // conteo base por los que fallaron en resolución
   let failed = failedResolution.length;
+  const failedTasks = []; // tareas que fallaron para retry
 
-  return new Promise((resolve) => {
+  await new Promise((resolve) => {
     const queue = downloadQueue({
       tasks,
       concurrency: 4,
       onProgress: (info) => {
-        downloaded = info.done;
         failed = info.failed + failedResolution.length;
-
         onProgress?.({
           done: info.done,
           total: tasks.length,
           label: info.label,
-          percent: 10 + (info.done / tasks.length) * 90, // 10-100%
+          percent: 10 + (info.done / tasks.length) * 80, // 10-90%
           downloaded: info.done,
           failed,
           status: 'progress',
         });
       },
-      onDone: () => {
-        console.log(`${LOG_PREFIX} ✓ Descarga completada: ${downloaded}/${tasks.length} mods`);
-
-        // Agregar resultados exitosos
-        for (const task of tasks) {
-          const meta = taskMeta.get(task);
-          results.push({
-            success: true,
-            projectID: meta.projectID,
-            fileID: meta.fileID,
-            modName: task.label,
-            fileName: meta.fileName,
-          });
+      onError: (taskOrErr) => {
+        // Recopilar tareas fallidas para retry
+        if (taskOrErr && taskMeta.has(taskOrErr)) {
+          failedTasks.push(taskMeta.get(taskOrErr));
         }
-
-        resolve({
-          downloaded: tasks.length - (failed - failedResolution.length),
-          failed,
-          total,
-          results,
-        });
       },
-      onError: (err) => {
-        console.error(`${LOG_PREFIX} Error en cola:`, err);
-      },
+      onDone: () => resolve(),
     });
-
-    queue.run().catch((err) => {
-      console.error(`${LOG_PREFIX} Error ejecutando cola:`, err);
-      resolve({
-        downloaded,
-        failed: total - downloaded,
-        total,
-        results,
-      });
-    });
+    queue.run().catch(() => resolve());
   });
+
+  // ── Retry de mods fallidos con URL fresca (hasta 3 intentos) ────────────
+  for (const meta of failedTasks) {
+    let retried = false;
+    for (let attempt = 1; attempt <= 3 && !retried; attempt++) {
+      try {
+        const fresh = await resolveDownloadUrl(meta.projectID, meta.fileID, meta.fileName);
+        await tauriCmd('download_file', {
+          url: fresh.url,
+          dest: `${modsDir}/${fresh.fileName}`,
+          sha1: fresh.sha1 ?? null,
+          label: fresh.fileName,
+        });
+        retried = true;
+        failed = Math.max(0, failed - 1);
+      } catch {
+        // siguiente intento
+      }
+    }
+    if (!retried) {
+      results.push({
+        success: false,
+        projectID: meta.projectID,
+        fileID: meta.fileID,
+        modName: meta.fileName,
+        error: 'Fallido tras 3 reintentos',
+      });
+    }
+  }
+
+  // Agregar resultados exitosos
+  const successCount = tasks.length - failedTasks.length + failedTasks.filter((_, i) => {
+    return !results.some(r => !r.success && r.fileID === failedTasks[i]?.fileID);
+  }).length;
+
+  onProgress?.({
+    done: tasks.length,
+    total,
+    label: 'Descarga completada',
+    percent: 100,
+    downloaded: successCount,
+    failed,
+    status: 'done',
+  });
+
+  return {
+    downloaded: successCount,
+    failed,
+    total,
+    results,
+  };
 }
 
 /**

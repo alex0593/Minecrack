@@ -557,6 +557,10 @@ export const deleteShaderPack = (launcherDir, instanceId, filename) =>
 export const createDirAll = (path) =>
   tauriCmd('create_dir_all', { path });
 
+/** Elimina un directorio y todo su contenido (equivalente a rm -rf) */
+export const removeDir = (path) =>
+  tauriCmd('remove_dir', { path });
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -712,6 +716,8 @@ async function mockCommand(command, _args) {
     case 'delete_shaderpack':
       return Promise.resolve();
     case 'create_dir_all':
+      return Promise.resolve();
+    case 'remove_dir':
       return Promise.resolve();
     case 'read_file_base64':
       return Promise.reject(new Error('read_file_base64: no disponible en browser'));

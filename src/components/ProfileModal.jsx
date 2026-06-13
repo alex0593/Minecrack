@@ -1,8 +1,33 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { generateOfflineUUID } from '../lib/instances';
 import { pickFile, readFileBase64 } from '../lib/tauri';
 import './ProfileModal.css';
+
+function SkinFacePreview({ skinBase64 }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    if (!skinBase64 || !canvasRef.current) return;
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvasRef.current?.getContext('2d');
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, 64, 64);
+      ctx.drawImage(img, 8, 8, 8, 8, 0, 0, 64, 64);
+    };
+    img.src = skinBase64;
+  }, [skinBase64]);
+  return (
+    <canvas
+      ref={canvasRef}
+      width={64}
+      height={64}
+      style={{ imageRendering: 'pixelated', width: 64, height: 64 }}
+      className="profile-avatar-render"
+    />
+  );
+}
 
 const PRESET_SKINS = [
   { label: 'Steve', uuid: '8667ba71-b85a-4004-af54-457a9734eed7' },
@@ -163,11 +188,7 @@ export default function ProfileModal() {
                     onError={e => { e.target.style.display = 'none'; }}
                   />
                 ) : skinBase64 ? (
-                  <img
-                    src={skinBase64}
-                    alt="skin"
-                    className="profile-avatar-render profile-avatar-raw"
-                  />
+                  <SkinFacePreview skinBase64={skinBase64} />
                 ) : (
                   <div className="profile-avatar-placeholder">🪖</div>
                 )}
@@ -236,8 +257,8 @@ export default function ProfileModal() {
                   />
                 ) : skinBase64 ? (
                   <div className="profile-skin-custom-box">
-                    <img src={skinBase64} alt="Skin personalizada" className="profile-skin-texture" />
-                    <span className="profile-skin-custom-label">Textura PNG</span>
+                    <SkinFacePreview skinBase64={skinBase64} />
+                    <span className="profile-skin-custom-label">Vista previa de cara</span>
                   </div>
                 ) : (
                   <div className="profile-skin-empty">

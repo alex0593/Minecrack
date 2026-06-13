@@ -6,6 +6,8 @@ const initialState = {
   instances: [],
   selectedInstanceId: null,
   instanceMods: [],         // Mods de la instancia seleccionada
+  instanceResourcePacks: [], // Resource packs de la instancia seleccionada
+  instanceShaderpacks: [],   // Shaderpacks de la instancia seleccionada
 
   // Perfil offline
   profile: {
@@ -78,10 +80,22 @@ function reducer(state, action) {
       };
 
     case 'SELECT_INSTANCE':
-      return { ...state, selectedInstanceId: action.payload, instanceMods: [] };
+      return {
+        ...state,
+        selectedInstanceId: action.payload,
+        instanceMods: [],
+        instanceResourcePacks: [],
+        instanceShaderpacks: [],
+      };
 
     case 'SET_INSTANCE_MODS':
       return { ...state, instanceMods: action.payload };
+
+    case 'SET_INSTANCE_RESOURCE_PACKS':
+      return { ...state, instanceResourcePacks: action.payload };
+
+    case 'SET_INSTANCE_SHADERPACKS':
+      return { ...state, instanceShaderpacks: action.payload };
 
     case 'SET_PROFILE':
       return { ...state, profile: action.payload, profileReady: true };

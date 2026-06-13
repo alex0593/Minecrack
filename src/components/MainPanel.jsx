@@ -60,23 +60,25 @@ function WelcomeView() {
 
 /* ─── Pack Tab (Resource Packs / Shaders) ────── */
 function PacksTab({ instance, type }) {
-  const [packs, setPacks]     = useState([]);
   const [loading, setLoading] = useState(false);
-  const { openModal } = useStore();
+  const { state, dispatch, openModal } = useStore();
 
-  const listFn   = type === 'resourcepacks' ? listResourcePacks : listShaderPacks;
-  const addFn    = type === 'resourcepacks' ? addResourcePack   : addShaderPack;
-  const deleteFn = type === 'resourcepacks' ? deleteResourcePack : deleteShaderPack;
-  const label    = type === 'resourcepacks' ? 'Resource Packs' : 'Shaderpacks';
-  const icon     = type === 'resourcepacks' ? '🎨' : '✨';
+  const listFn    = type === 'resourcepacks' ? listResourcePacks : listShaderPacks;
+  const addFn     = type === 'resourcepacks' ? addResourcePack   : addShaderPack;
+  const deleteFn  = type === 'resourcepacks' ? deleteResourcePack : deleteShaderPack;
+  const label     = type === 'resourcepacks' ? 'Resource Packs' : 'Shaderpacks';
+  const icon      = type === 'resourcepacks' ? '🎨' : '✨';
   const modalName = type === 'resourcepacks' ? 'resourcePackBrowser' : 'shaderPackBrowser';
+  const storeKey  = type === 'resourcepacks' ? 'SET_INSTANCE_RESOURCE_PACKS' : 'SET_INSTANCE_SHADERPACKS';
+
+  const packs = type === 'resourcepacks' ? state.instanceResourcePacks : state.instanceShaderpacks;
 
   const load = async () => {
     setLoading(true);
     try {
       const dir = await getLauncherDir();
       const list = await listFn(dir, instance.id);
-      setPacks(list);
+      dispatch({ type: storeKey, payload: list });
     } catch (err) {
       console.error(`[PacksTab] Error cargando ${label}:`, err);
     } finally {

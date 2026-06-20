@@ -481,11 +481,17 @@ async fn launch_game(
 
     eprintln!("[Rust] ✓ Intentando lanzar Java con {} argumentos...", args.len());
 
-    let mut child = tokio::process::Command::new(&config.java_path)
-        .args(&args)
+    let mut std_cmd = std::process::Command::new(&config.java_path);
+    std_cmd.args(&args)
         .current_dir(&config.game_dir)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        std_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let mut child = tokio::process::Command::from(std_cmd)
         .spawn()
         .map_err(|e| {
             eprintln!("[Rust] ✗ FATAL: No se pudo lanzar Java. Error: {}", e);
@@ -1327,10 +1333,11 @@ fn detect_java_internal(launcher_dir: Option<String>) -> Vec<JavaInstall> {
                 let java_bin = entry.path().join("bin").join("java");
 
                 if java_bin.exists() {
-                    if let Ok(output) = std::process::Command::new(&java_bin)
-                        .arg("-version")
-                        .output()
-                    {
+                    let mut cmd = std::process::Command::new(&java_bin);
+                    cmd.arg("-version");
+                    #[cfg(target_os = "windows")]
+                    { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+                    if let Ok(output) = cmd.output() {
                         let ver_str = String::from_utf8_lossy(&output.stderr).to_string()
                             + &String::from_utf8_lossy(&output.stdout);
                         let first_line = ver_str.lines().next().unwrap_or("?").to_string();
@@ -1347,7 +1354,11 @@ fn detect_java_internal(launcher_dir: Option<String>) -> Vec<JavaInstall> {
     }
 
     // También intenta el java del PATH
-    if let Ok(output) = std::process::Command::new("java").arg("-version").output() {
+    let mut path_cmd = std::process::Command::new("java");
+    path_cmd.arg("-version");
+    #[cfg(target_os = "windows")]
+    { use std::os::windows::process::CommandExt; path_cmd.creation_flags(0x08000000); }
+    if let Ok(output) = path_cmd.output() {
         let ver_str = String::from_utf8_lossy(&output.stderr).to_string();
         let first_line = ver_str.lines().next().unwrap_or("?").to_string();
         let major = parse_java_major(&first_line);
@@ -1714,7 +1725,11 @@ async fn validate_java(java_path: String) -> JavaValidation {
         };
     }
 
-    match std::process::Command::new(&java_path).arg("-version").output() {
+    let mut val_cmd = std::process::Command::new(&java_path);
+    val_cmd.arg("-version");
+    #[cfg(target_os = "windows")]
+    { use std::os::windows::process::CommandExt; val_cmd.creation_flags(0x08000000); }
+    match val_cmd.output() {
         Ok(output) => {
             let ver_str = String::from_utf8_lossy(&output.stderr).to_string()
                 + &String::from_utf8_lossy(&output.stdout);

@@ -179,7 +179,14 @@
   gap: var(--gap-md);
 }
 
+.wizard-search-row {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+}
+
 .wizard-search-input {
+  flex: 1;
   padding: var(--gap-md);
   background: var(--bg-base);
   border: 1px solid var(--border);

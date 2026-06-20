@@ -561,6 +561,10 @@ export const createDirAll = (path) =>
 export const removeDir = (path) =>
   tauriCmd('remove_dir', { path });
 
+/** Copia un directorio recursivamente; no-op si src no existe */
+export const copyDir = (src, dst) =>
+  tauriCmd('copy_dir', { src, dst });
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -571,6 +575,10 @@ async function mockCommand(command, _args) {
     case 'get_launcher_dir':
       return Promise.resolve('/mock/minecrack');
     case 'ensure_dir':
+      return Promise.resolve();
+    case 'remove_dir':
+      return Promise.resolve();
+    case 'copy_dir':
       return Promise.resolve();
     case 'write_file':
       return Promise.resolve();

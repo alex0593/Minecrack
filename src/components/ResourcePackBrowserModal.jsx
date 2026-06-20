@@ -57,27 +57,41 @@ function PackDetail({ pack, instance, source, onInstalled }) {
       let downloadUrl, fileName, sha1 = null;
 
       if (source === 'modrinth') {
-        // Fetch versions to get the latest file
-        const versions = await getProjectVersions(pack.project_id, {
+        // Buscar versiones compatibles con la versión MC de la instancia
+        let versions = await getProjectVersions(pack.project_id, {
           gameVersion: instance?.version,
         });
-        if (!versions || versions.length === 0) throw new Error('No versions found for this pack');
+        // Fallback: si no hay versiones para esa MC, obtener la más reciente sin filtro
+        if (!versions || versions.length === 0) {
+          versions = await getProjectVersions(pack.project_id, {});
+        }
+        if (!versions || versions.length === 0) throw new Error('No se encontraron versiones para este resource pack');
         const latestVersion = versions[0];
         const primaryFile = latestVersion.files?.find(f => f.primary) ?? latestVersion.files?.[0];
-        if (!primaryFile) throw new Error('No file found for this pack');
+        if (!primaryFile) throw new Error('No se encontró archivo en esta versión');
         downloadUrl = primaryFile.url;
         fileName = primaryFile.filename;
       } else if (source === 'curseforge') {
-        // Fetch mod files to get the latest file
-        const files = await getModFiles(pack.id, {
+        // Buscar archivos compatibles con la versión MC
+        let files = await getModFiles(pack.id, {
           gameVersion: instance?.version,
-          limit: 1,
+          limit: 5,
         });
-        if (!files || files.length === 0) throw new Error('No files found for this pack');
+        // Fallback sin filtro de versión
+        if (!files || files.length === 0) {
+          files = await getModFiles(pack.id, { limit: 5 });
+        }
+        if (!files || files.length === 0) throw new Error('No se encontraron archivos para este resource pack');
         const fileInfo = files[0];
-        downloadUrl = fileInfo.downloadUrl;
         fileName = fileInfo.fileName;
         sha1 = extractSha1(fileInfo);
+        // CurseForge a veces omite downloadUrl → usar URL del CDN como fallback
+        if (fileInfo.downloadUrl) {
+          downloadUrl = fileInfo.downloadUrl;
+        } else {
+          const fid = fileInfo.id;
+          downloadUrl = `https://mediafilez.forgecdn.net/files/${Math.floor(fid / 1000)}/${fid % 1000}/${encodeURIComponent(fileName)}`;
+        }
       }
 
       // Descargar el pack directamente a la carpeta resourcepacks/

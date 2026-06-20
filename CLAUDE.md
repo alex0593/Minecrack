@@ -41,11 +41,11 @@ Rust  → window.emit("event://name", payload) → tauriListen('event://name', h
 
 **Important**: `tauriCmd` silently falls back to mock responses on failure — failed commands do not throw in browser dev mode. Always test in Tauri (not browser) when debugging backend integration.
 
-Typed wrappers in `tauri.js` (prefer these over raw `tauriCmd`): `getLauncherDir`, `downloadFile`, `launchGame`, `detectJava`, `listMods`, `downloadMod`, `verifyInstance`, etc.
+Typed wrappers in `tauri.js` (prefer these over raw `tauriCmd`): `getLauncherDir`, `downloadFile`, `launchGame`, `detectJava`, `listMods`, `downloadMod`, `verifyInstance`, `removeDir`, `copyDir`, etc.
 
 ### Rust Commands (registered in `src-tauri/src/lib.rs`)
 
-File system: `get_launcher_dir`, `ensure_dir`, `create_dir_all`, `remove_dir`, `write_file`, `read_file`, `delete_file`, `write_file_base64`, `read_file_base64`, `copy_file`, `file_exists`, `extract_zip`
+File system: `get_launcher_dir`, `ensure_dir`, `create_dir_all`, `remove_dir`, `copy_dir`, `write_file`, `read_file`, `delete_file`, `write_file_base64`, `read_file_base64`, `copy_file`, `file_exists`, `extract_zip`
 
 Download & launch: `download_file`, `download_mod`, `download_resourcepack`, `download_shaderpack`, `prepare_game_launch`, `launch_game`
 
@@ -121,7 +121,7 @@ Client JAR lookup order: `libraries/net/minecraft/client/{v}/client-{v}.jar` (Pr
 
 Two entry points, same underlying flow:
 
-- **`ModpackImportWizard.jsx`** — 4-step wizard (search → preview → config → install). CurseForge branch: downloads ZIP, extracts to `temp-modpack-{ts}/`, reads `manifest.json`, creates instance, downloads mods via `downloadMultipleModsFromCurseForge`, marks `installed: true`, cleans temp dir in `finally`. Modrinth branch: downloads `.mrpack`, extracts, reads `modrinth.index.json`, downloads files sequentially with per-file progress.
+- **`ModpackImportWizard.jsx`** — 4-step wizard (search → preview → config → install). Step 1 includes a MC version filter (`mcVersion` state) passed to both Modrinth and CurseForge search. CurseForge branch: downloads ZIP, extracts to `temp-modpack-{ts}/`, reads `manifest.json`, creates instance, downloads mods via `downloadMultipleModsFromCurseForge`, marks `installed: true`, cleans temp dir in `finally`. Modrinth branch: downloads `.mrpack`, extracts, reads `modrinth.index.json`, downloads files sequentially with per-file progress.
 - **`ModpackInstallModal.jsx`** — single-click install from the browser modal. Uses `importInstanceFromFolder` (Rust) which copies `overrides/` and writes `installed: true` to `instances.json`. Then downloads mods via `downloadMultipleModsFromCurseForge`, marks `installed: true` in the store, cleans temp dir in `finally`.
 
 Both clean up `temp-modpack-*` directories via `removeDir` in a `try/finally` block.
@@ -133,6 +133,7 @@ The `installed` flag on an instance controls the play button: `false` → opens 
 - `App.jsx` — root layout + modal dispatch; `DownloadOverlay` handles MC version + libraries download and sets `installed: true` when done
 - `Sidebar.jsx` — profile card, nav tabs, instance list
 - `MainPanel.jsx` — instance detail (hero + Mods/Recursos/Shaders/Stats/Console tabs) or welcome screen; `PacksTab` reads `instanceResourcePacks`/`instanceShaderpacks` from store and dispatches after each load, so browser-modal installs update the list immediately
+- `ResourcePackBrowserModal.jsx` / `ShaderPackBrowserModal.jsx` — both share `PackBrowserModal.css`. Version resolution uses a two-attempt pattern: first tries the instance's MC version; if no results, falls back to latest with no version filter. CurseForge installs also fall back to the CDN URL (`mediafilez.forgecdn.net`) when `downloadUrl` is absent, matching the same CDN fallback used by `curseforge-downloader.js`.
 - `TitleBar.jsx` — custom window controls (Tauri native decorations are disabled)
 - CSS uses `--color-*` variables defined in `index.css`; dark gaming theme with emerald accents
 

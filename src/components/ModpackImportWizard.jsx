@@ -28,6 +28,7 @@ import {
   readFile,
   ensureDir,
   removeDir,
+  copyDir,
 } from '../lib/tauri';
 import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
 import ProgressBar from './ui/ProgressBar';
@@ -35,6 +36,7 @@ import ErrorModal from './ui/ErrorModal';
 import './ModpackImportWizard.css';
 
 const LOADERS_MODPACK = ['fabric', 'forge', 'quilt', 'neoforge'];
+const MC_VERSIONS = ['1.21.4', '1.21.1', '1.20.1', '1.19.2', '1.18.2', '1.16.5', '1.12.2'];
 const LIMIT = 20;
 const EMOJI_ICONS = ['🎮', '🌲', '🔧', '⚙️', '💎', '🏔️', '🌊', '🔥', '❄️', '⚡', '🌙', '☀️'];
 
@@ -83,16 +85,17 @@ function ModpackCard({ source, pack, onClick, isSelected }) {
 function Step1Search({ onNext }) {
   const [source, setSource] = useState('modrinth');
   const [searchQuery, setSearchQuery] = useState('');
+  const [mcVersion, setMcVersion] = useState('1.21.1');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
 
-  // Cargar modpacks cuando cambia source o búsqueda
+  // Cargar modpacks cuando cambia source, búsqueda o versión
   useEffect(() => {
     loadModpacks();
-  }, [source, searchQuery]);
+  }, [source, searchQuery, mcVersion]);
 
   const loadModpacks = async (off = 0) => {
     setLoading(true);
@@ -102,6 +105,7 @@ function Step1Search({ onNext }) {
       if (source === 'modrinth') {
         data = await searchModrinthPacks({
           query: searchQuery || '',
+          gameVersion: mcVersion,
           limit: LIMIT,
           offset: off,
         });
@@ -111,6 +115,7 @@ function Step1Search({ onNext }) {
       } else {
         // CurseForge - buscar con nombre o query vacía para populares
         const result = await searchCurseforgePacks(searchQuery || ' ', {
+          gameVersion: mcVersion,
           limit: LIMIT,
           offset: off,
         });
@@ -137,6 +142,12 @@ function Step1Search({ onNext }) {
     setOffset(0);
   };
 
+  const handleVersionChange = (v) => {
+    setMcVersion(v);
+    setResults([]);
+    setOffset(0);
+  };
+
   const handleLoadMore = () => {
     const newOffset = offset + LIMIT;
     setOffset(newOffset);
@@ -144,7 +155,7 @@ function Step1Search({ onNext }) {
   };
 
   const handleSelectPack = (pack) => {
-    onNext({ source, pack, gameVersion: '1.20.1' });
+    onNext({ source, pack, gameVersion: mcVersion });
   };
 
   return (
@@ -156,14 +167,26 @@ function Step1Search({ onNext }) {
         </div>
       </div>
 
-      {/* Search input */}
-      <input
-        type="text"
-        className="input wizard-search-input"
-        placeholder="🔍 Buscar modpack por nombre..."
-        value={searchQuery}
-        onChange={handleSearchChange}
-      />
+      {/* Filtros: búsqueda + versión MC */}
+      <div className="wizard-search-row">
+        <input
+          type="text"
+          className="input wizard-search-input"
+          placeholder="🔍 Buscar modpack por nombre..."
+          value={searchQuery}
+          onChange={handleSearchChange}
+        />
+        <select
+          className="input wizard-version-select"
+          value={mcVersion}
+          onChange={e => handleVersionChange(e.target.value)}
+          title="Versión de Minecraft"
+        >
+          {MC_VERSIONS.map(v => (
+            <option key={v} value={v}>MC {v}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Source tabs */}
       <div className="wizard-tabs">
@@ -288,9 +311,9 @@ function Step2Preview({ source, pack, gameVersion, onNext, onBack }) {
 
   return (
     <div className="wizard-step-preview compact">
-      <h2>Modpack Preview</h2>
+      <h2>Vista previa del modpack</h2>
 
-      {loading && <div className="wizard-loading">Loading versions...</div>}
+      {loading && <div className="wizard-loading">Cargando versiones...</div>}
 
       {!loading && (
         <>
@@ -300,39 +323,45 @@ function Step2Preview({ source, pack, gameVersion, onNext, onBack }) {
             )}
             <div className="wizard-preview-info">
               <h3>{display.title}</h3>
-              <p className="wizard-preview-author">by {display.author}</p>
+              <p className="wizard-preview-author">por {display.author}</p>
               <p className="wizard-preview-desc">{display.desc}</p>
             </div>
           </div>
 
-          <div className="wizard-version-selector">
-            <label>Select Version:</label>
-            <select
-              className="input"
-              value={selectedVersion?.id || selectedVersion?.versionNumber || ''}
-              onChange={(e) => {
-                const v = versions.find(v => (v.id || v.versionNumber) === e.target.value);
-                setSelectedVersion(v);
-              }}
-            >
-              {versions.map(v => (
-                <option key={v.id || v.versionNumber} value={v.id || v.versionNumber}>
-                  {v.name || v.displayName} ({v.game_versions?.[0] || v.gameVersions?.[0] || '?'})
-                </option>
-              ))}
-            </select>
-          </div>
+          {versions.length === 0 && !error && (
+            <div className="wizard-error">No se encontraron versiones para esta combinación de MC/loader.</div>
+          )}
+
+          {versions.length > 0 && (
+            <div className="wizard-version-selector">
+              <label>Seleccionar versión:</label>
+              <select
+                className="input"
+                value={selectedVersion?.id || selectedVersion?.versionNumber || ''}
+                onChange={(e) => {
+                  const v = versions.find(v => (v.id || v.versionNumber) === e.target.value);
+                  setSelectedVersion(v);
+                }}
+              >
+                {versions.map(v => (
+                  <option key={v.id || v.versionNumber} value={v.id || v.versionNumber}>
+                    {v.name || v.displayName} ({v.game_versions?.[0] || v.gameVersions?.[0] || '?'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {error && <div className="wizard-error">{error}</div>}
 
           <div className="wizard-button-group">
-            <button className="btn btn-ghost" onClick={onBack}>Back</button>
+            <button className="btn btn-ghost" onClick={onBack}>Atrás</button>
             <button
               className="btn btn-primary"
               onClick={() => onNext(selectedVersion)}
               disabled={!selectedVersion}
             >
-              Next
+              Siguiente
             </button>
           </div>
         </>
@@ -348,12 +377,17 @@ function Step3Config({ pack, version, source, gameVersion, onNext, onBack }) {
   const [ram, setRam] = useState('4GB');
   const [jvmArgs, setJvmArgs] = useState('');
 
+  // Extraer la versión MC real desde la versión seleccionada del modpack
+  const actualMcVersion = version?.game_versions?.[0]
+    || version?.gameVersions?.[0]
+    || gameVersion;
+
   return (
     <div className="wizard-step-config">
-      <h2>Instance Configuration</h2>
+      <h2>Configurar instancia</h2>
 
       <div className="wizard-form-group">
-        <label htmlFor="instance-name">Instance Name:</label>
+        <label htmlFor="instance-name">Nombre:</label>
         <input
           id="instance-name"
           type="text"
@@ -365,7 +399,7 @@ function Step3Config({ pack, version, source, gameVersion, onNext, onBack }) {
       </div>
 
       <div className="wizard-form-group">
-        <label>Icon:</label>
+        <label>Icono:</label>
         <div className="wizard-icon-picker">
           {EMOJI_ICONS.map(icon => (
             <button
@@ -380,7 +414,7 @@ function Step3Config({ pack, version, source, gameVersion, onNext, onBack }) {
       </div>
 
       <div className="wizard-form-group">
-        <label htmlFor="ram-select">RAM Allocation:</label>
+        <label htmlFor="ram-select">RAM asignada:</label>
         <select
           id="ram-select"
           className="input"
@@ -393,40 +427,38 @@ function Step3Config({ pack, version, source, gameVersion, onNext, onBack }) {
           <option value="4GB">4 GB</option>
           <option value="6GB">6 GB</option>
           <option value="8GB">8 GB</option>
-          <option value="custom">Custom</option>
         </select>
       </div>
 
       <div className="wizard-form-group">
-        <label htmlFor="jvm-args">JVM Arguments (Optional):</label>
+        <label htmlFor="jvm-args">Argumentos JVM (opcional):</label>
         <textarea
           id="jvm-args"
           className="input"
-          rows="4"
-          placeholder="-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+DisableExplicitGC"
+          rows="3"
+          placeholder="-XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           value={jvmArgs}
           onChange={(e) => setJvmArgs(e.target.value)}
         />
       </div>
 
       <div className="wizard-config-info">
-        <strong>Modpack Info:</strong>
-        <p>Version: {gameVersion}</p>
-        <p>Source: {source === 'modrinth' ? 'Modrinth' : 'CurseForge'}</p>
+        <strong>Info del modpack:</strong>
+        <p>MC {actualMcVersion} · {source === 'modrinth' ? 'Modrinth' : 'CurseForge'}</p>
       </div>
 
       <div className="wizard-button-group">
-        <button className="btn btn-ghost" onClick={onBack}>Back</button>
+        <button className="btn btn-ghost" onClick={onBack}>Atrás</button>
         <button
           className="btn btn-primary"
           onClick={() => onNext({
-            instanceName: instanceName.trim() || 'New Modpack',
+            instanceName: instanceName.trim() || pack.title || pack.name || 'Modpack',
             icon: selectedIcon,
             ram,
             jvmArgs,
           })}
         >
-          Install
+          Instalar
         </button>
       </div>
     </div>
@@ -444,36 +476,37 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
   useEffect(() => {
     const performInstall = async () => {
       try {
-        setProgressLabel('Getting launcher directory...');
+        setProgressLabel('Obteniendo directorio del launcher...');
         setProgress(5);
 
         const launcherDir = await getLauncherDir();
 
-        // Parse RAM: convert string like "4GB" to number (MB), or use raw number
+        // Convertir "4GB" → 4096 MB, o usar el número directo
         const ramMb = typeof config.ram === 'string'
           ? parseInt(config.ram) * (config.ram.toLowerCase().includes('gb') ? 1024 : 1)
           : (config.ram || 2048);
 
-        // Determine download URL and extract logic based on source
         if (source === 'curseforge') {
-          // CurseForge: download ZIP
+          // ── CurseForge: descargar ZIP ──────────────────────────────────────
           setProgressLabel(`Descargando ${pack.name}...`);
           setProgress(10);
 
           const url = await getModpackDownloadUrl(pack.id, version.id);
-          const zipPath = `${launcherDir}/modpacks/${pack.slug || pack.name.replace(/\s+/g, '-')}-${Date.now()}.zip`;
+          const modpacksDir = `${launcherDir}/modpacks`;
+          await ensureDir(modpacksDir);
+          const zipPath = `${modpacksDir}/${(pack.slug || pack.name).replace(/\s+/g, '-')}-${Date.now()}.zip`;
 
           await downloadFile(url, zipPath, null, pack.name || 'modpack');
 
           setProgressLabel('Extrayendo archivos...');
-          setProgress(30);
+          setProgress(25);
 
           const tempDir = `${launcherDir}/temp-modpack-${Date.now()}`;
           await extractZip(zipPath, tempDir);
 
           try {
-            setProgressLabel('Creando estructura de instancia...');
-            setProgress(40);
+            setProgressLabel('Leyendo manifest...');
+            setProgress(35);
 
             const instanceId = uuidv4();
             const instancePath = `${launcherDir}/instances/${instanceId}`;
@@ -483,14 +516,21 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
             const manifest = JSON.parse(manifestContent);
 
             const cfGameVersion = manifest.minecraft?.version || gameVersion || '1.20.1';
-            const loaderType = (manifest.minecraft?.modLoaders?.[0]?.id || '').toLowerCase();
-            const loaderVersion = manifest.minecraft?.modLoaders?.[0]?.version || '';
+            const rawLoader = (manifest.minecraft?.modLoaders?.[0]?.id || '').toLowerCase();
+            // CF modLoader id es algo como "forge-47.0.19", "fabric-0.14.21", etc.
+            const loaderType = rawLoader.includes('neoforge') ? 'neoforge'
+              : rawLoader.includes('forge') ? 'forge'
+              : rawLoader.includes('fabric') ? 'fabric'
+              : rawLoader.includes('quilt') ? 'quilt'
+              : 'vanilla';
+            // La versión del loader viene después del guion: "forge-47.0.19" → "47.0.19"
+            const loaderVersion = manifest.minecraft?.modLoaders?.[0]?.id?.split('-').slice(1).join('-') || '';
 
             const newInstance = {
               id: instanceId,
               name: config.instanceName || pack.name,
               version: cfGameVersion,
-              loader: loaderType.includes('forge') ? 'forge' : loaderType.includes('fabric') ? 'fabric' : 'vanilla',
+              loader: loaderType,
               loaderVersion: loaderVersion,
               icon: config.icon || '📦',
               ram: ramMb,
@@ -504,9 +544,14 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
 
             dispatch({ type: 'ADD_INSTANCE', payload: newInstance });
 
-            setProgressLabel('Preparando descarga de mods...');
-            setProgress(50);
+            // Copiar overrides/ → instancia (configs, scripts, resourcepacks, etc.)
+            setProgressLabel('Copiando archivos de configuración (overrides)...');
+            setProgress(45);
+            await copyDir(`${tempDir}/overrides`, instancePath).catch(e =>
+              console.warn('[Modpack CF] overrides no encontrados o error:', e)
+            );
 
+            // Descargar mods desde manifest.files
             if (manifest.files && manifest.files.length > 0) {
               const modsToGet = manifest.files
                 .filter(f => f.required !== false)
@@ -514,15 +559,15 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
 
               const modsTotal = modsToGet.length;
               setProgressLabel(`Descargando ${modsTotal} mods...`);
-              setProgress(70);
+              setProgress(55);
 
               await downloadMultipleModsFromCurseForge(
                 launcherDir,
                 instanceId,
                 modsToGet,
                 (info) => {
-                  setProgress(70 + Math.round((info.done / modsTotal) * 28));
-                  setProgressLabel(`Descargando mod ${info.done}/${modsTotal}: ${info.label || ''}`);
+                  setProgress(55 + Math.round((info.done / modsTotal) * 40));
+                  setProgressLabel(`Mod ${info.done}/${modsTotal}: ${info.label || ''}`);
                 }
               );
             }
@@ -535,27 +580,29 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           setProgress(100);
           setProgressLabel('¡Instalación completa!');
           setDone(true);
+
         } else {
-          // Modrinth: download .mrpack file
-          setProgressLabel(`Downloading ${pack.title}...`);
+          // ── Modrinth: descargar .mrpack ────────────────────────────────────
+          setProgressLabel(`Descargando ${pack.title}...`);
           setProgress(10);
 
-          // Find download URL in version
           const downloadUrl = version.files?.find(f => f.primary)?.url || version.files?.[0]?.url;
-          if (!downloadUrl) throw new Error('No download URL found in Modrinth version');
+          if (!downloadUrl) throw new Error('No se encontró URL de descarga en la versión de Modrinth');
 
-          const mrpackPath = `${launcherDir}/modpacks/${pack.slug || pack.title.replace(/\s+/g, '-')}-${Date.now()}.mrpack`;
+          const modpacksDir = `${launcherDir}/modpacks`;
+          await ensureDir(modpacksDir);
+          const mrpackPath = `${modpacksDir}/${(pack.slug || pack.title).replace(/\s+/g, '-')}-${Date.now()}.mrpack`;
           await downloadFile(downloadUrl, mrpackPath, null, pack.title || 'modpack');
 
           setProgressLabel('Extrayendo archivos...');
-          setProgress(30);
+          setProgress(25);
 
           const mrTempDir = `${launcherDir}/temp-modpack-${Date.now()}`;
           await extractZip(mrpackPath, mrTempDir);
 
           try {
-            setProgressLabel('Creando estructura de instancia...');
-            setProgress(40);
+            setProgressLabel('Leyendo índice del modpack...');
+            setProgress(35);
 
             const mrInstanceId = uuidv4();
             const mrInstancePath = `${launcherDir}/instances/${mrInstanceId}`;
@@ -564,15 +611,18 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
             const indexContent = await readFile(`${mrTempDir}/modrinth.index.json`);
             const modrinthIndex = JSON.parse(indexContent);
 
-            const mrGameVersion = modrinthIndex.game || '1.20.1';
-            const loaders = modrinthIndex.dependencies || {};
+            // BUGFIX: modrinthIndex.game === "minecraft" (nombre del juego, NO la versión)
+            // La versión MC real está en modrinthIndex.dependencies.minecraft
+            const deps = modrinthIndex.dependencies || {};
+            const mrGameVersion = deps.minecraft || gameVersion || '1.20.1';
 
+            // Detectar loader: las keys reales en dependencies son 'fabric-loader', 'quilt-loader', 'forge', 'neoforge'
             let mrLoaderType = 'vanilla';
             let mrLoaderVersion = '';
-            if (loaders.fabric) { mrLoaderType = 'fabric'; mrLoaderVersion = loaders.fabric; }
-            else if (loaders.quilt) { mrLoaderType = 'quilt'; mrLoaderVersion = loaders.quilt; }
-            else if (loaders.forge) { mrLoaderType = 'forge'; mrLoaderVersion = loaders.forge; }
-            else if (loaders.neoforge) { mrLoaderType = 'neoforge'; mrLoaderVersion = loaders.neoforge; }
+            if (deps['fabric-loader'])  { mrLoaderType = 'fabric';   mrLoaderVersion = deps['fabric-loader']; }
+            else if (deps['quilt-loader'])  { mrLoaderType = 'quilt';    mrLoaderVersion = deps['quilt-loader']; }
+            else if (deps.forge)         { mrLoaderType = 'forge';    mrLoaderVersion = deps.forge; }
+            else if (deps.neoforge)      { mrLoaderType = 'neoforge'; mrLoaderVersion = deps.neoforge; }
 
             const mrNewInstance = {
               id: mrInstanceId,
@@ -592,23 +642,35 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
 
             dispatch({ type: 'ADD_INSTANCE', payload: mrNewInstance });
 
+            // Copiar overrides/ → instancia
+            setProgressLabel('Copiando archivos de configuración (overrides)...');
+            setProgress(45);
+            await copyDir(`${mrTempDir}/overrides`, mrInstancePath).catch(e =>
+              console.warn('[Modpack MR] overrides no encontrados o error:', e)
+            );
+
+            // Descargar archivos del índice (mods + otros archivos)
             if (modrinthIndex.files && modrinthIndex.files.length > 0) {
               const mrFiles = modrinthIndex.files.filter(f => f.downloads?.length > 0);
               const mrTotal = mrFiles.length;
-              setProgressLabel(`Descargando ${mrTotal} mods...`);
-              setProgress(70);
+              setProgressLabel(`Descargando ${mrTotal} archivos...`);
+              setProgress(55);
 
-              await ensureDir(`${mrInstancePath}/mods`);
               for (let i = 0; i < mrFiles.length; i++) {
                 const file = mrFiles[i];
-                const modUrl = file.downloads[0];
-                const modFileName = file.path?.split('/').pop() || `mod-${i}.jar`;
-                setProgressLabel(`Descargando mod ${i + 1}/${mrTotal}: ${modFileName}`);
-                setProgress(70 + Math.round(((i + 1) / mrTotal) * 28));
+                const fileUrl = file.downloads[0];
+                // file.path puede ser "mods/sodium.jar" o "config/sodium.json"
+                const relPath = file.path || `mods/file-${i}`;
+                const destPath = `${mrInstancePath}/${relPath}`;
+                // Asegurar que existe el subdirectorio destino
+                const destDir = destPath.substring(0, destPath.lastIndexOf('/'));
+                await ensureDir(destDir).catch(() => {});
+                setProgressLabel(`Descargando ${i + 1}/${mrTotal}: ${relPath.split('/').pop()}`);
+                setProgress(55 + Math.round(((i + 1) / mrTotal) * 40));
                 try {
-                  await downloadFile(modUrl, `${mrInstancePath}/mods/${modFileName}`, file.hashes?.sha1, modFileName);
-                } catch {
-                  // Continue with remaining mods
+                  await downloadFile(fileUrl, destPath, file.hashes?.sha1, relPath.split('/').pop());
+                } catch (fileErr) {
+                  console.warn(`[Modpack MR] Falló ${relPath}:`, fileErr.message);
                 }
               }
             }
@@ -623,8 +685,8 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
           setDone(true);
         }
       } catch (err) {
-        console.error('[ModpackImportWizard] Installation error:', err);
-        setError(err?.message || 'Installation failed');
+        console.error('[ModpackImportWizard] Error en instalación:', err);
+        setError(err?.message || 'Error en la instalación');
       }
     };
 
@@ -633,7 +695,7 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
 
   return (
     <div className="wizard-step-install">
-      <h2>Installing {pack.title || pack.name}</h2>
+      <h2>Instalando {pack.title || pack.name}</h2>
 
       <ProgressBar percent={progress} />
 
@@ -647,16 +709,16 @@ function Step4Install({ source, pack, version, gameVersion, config, onClose }) {
 
       {done && (
         <div className="wizard-success">
-          ✅ Installation complete! Your modpack is ready to play.
+          ✅ ¡Instalación completa! Tu modpack está listo para jugar.
           <button className="btn btn-primary" onClick={onClose}>
-            Close
+            Cerrar
           </button>
         </div>
       )}
 
       {!done && !error && (
         <div className="wizard-installing">
-          Please wait while we install your modpack...
+          Por favor espera mientras instalamos el modpack...
         </div>
       )}
     </div>

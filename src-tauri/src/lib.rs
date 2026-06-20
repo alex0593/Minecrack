@@ -1795,6 +1795,18 @@ async fn remove_dir(path: String) -> Result<(), String> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// COMANDO: copy_dir — copia un directorio recursivamente
+// Usa copy_dir_recursive (definida más adelante, retorna Result<(), String>)
+// ─────────────────────────────────────────────────────────────────────────────
+#[tauri::command]
+async fn copy_dir(src: String, dst: String) -> Result<(), String> {
+    let src_path = PathBuf::from(&src);
+    if !src_path.exists() { return Ok(()); }
+    let dst_path = PathBuf::from(&dst);
+    copy_dir_recursive(&src_path, &dst_path)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Fix 4: Resource Packs y Shaderpacks
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2587,6 +2599,7 @@ pub fn run() {
             get_repair_tasks,
             extract_zip,
             remove_dir,
+            copy_dir,
             // Fix 4: Resource packs & Shaderpacks
             list_resourcepacks,
             add_resourcepack,

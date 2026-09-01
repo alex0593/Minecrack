@@ -15,6 +15,12 @@ describe('createInstance', () => {
     expect(inst.jvmArgs).toBe('');
     expect(inst.id).toBeTruthy();
     expect(inst.createdAt).toBeTruthy();
+    expect(inst).toMatchObject({
+      remoteModpack: null,
+      lastSyncedReleaseId: null,
+      lastSyncAt: null,
+      lastSyncStatus: null,
+    });
   });
 
   it('asigna icono por defecto según loader', () => {

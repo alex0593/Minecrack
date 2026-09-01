@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { getLauncherDir, writeFile } from '../lib/tauri';
+import { validateRemoteModpack } from '../lib/ecosystem-sync';
 import './InstanceSettingsModal.css';
 
 export default function InstanceSettingsModal({ instanceId, onClose }) {
@@ -10,6 +11,12 @@ export default function InstanceSettingsModal({ instanceId, onClose }) {
   const [name,    setName]    = useState(instance?.name    ?? '');
   const [ram,     setRam]     = useState(instance?.ram     ?? 2048);
   const [jvmArgs, setJvmArgs] = useState(instance?.jvmArgs ?? '');
+  const [remoteEnabled, setRemoteEnabled] = useState(Boolean(instance?.remoteModpack));
+  const [apiBaseUrl, setApiBaseUrl] = useState(instance?.remoteModpack?.apiBaseUrl ?? '');
+  const [modpackId, setModpackId] = useState(instance?.remoteModpack?.modpackId ?? '');
+  const [tracking, setTracking] = useState(instance?.remoteModpack?.tracking ?? 'active');
+  const [releaseId, setReleaseId] = useState(instance?.remoteModpack?.releaseId ?? '');
+  const [remoteError, setRemoteError] = useState('');
   const [saving,  setSaving]  = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -18,8 +25,15 @@ export default function InstanceSettingsModal({ instanceId, onClose }) {
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    setRemoteError('');
     try {
-      const updated = { ...instance, name: name.trim(), ram, jvmArgs };
+      const remoteModpack = remoteEnabled
+        ? validateRemoteModpack({ apiBaseUrl, modpackId, tracking, releaseId })
+        : null;
+      const updated = {
+        ...instance, name: name.trim(), ram, jvmArgs, remoteModpack,
+        ...(remoteEnabled ? {} : { lastSyncedReleaseId: null, lastSyncAt: null }),
+      };
       dispatch({ type: 'UPDATE_INSTANCE', payload: updated });
 
       // Persistir en disco
@@ -34,6 +48,7 @@ export default function InstanceSettingsModal({ instanceId, onClose }) {
       onClose();
     } catch (err) {
       console.error('[InstanceSettings] Error guardando:', err);
+      setRemoteError(err?.message || String(err));
     } finally {
       setSaving(false);
     }
@@ -139,6 +154,32 @@ export default function InstanceSettingsModal({ instanceId, onClose }) {
                 {new Date(instance.createdAt).toLocaleDateString()}
               </span>
             </div>
+          </div>
+
+          <div className="isettings-field">
+            <label className="isettings-remote-toggle">
+              <input type="checkbox" checked={remoteEnabled} onChange={e => setRemoteEnabled(e.target.checked)} />
+              Sincronizar con un modpack oficial
+            </label>
+            {remoteEnabled && <div className="isettings-remote-grid">
+              <label>Servidor
+                <input className="isettings-input" type="url" value={apiBaseUrl} onChange={e => setApiBaseUrl(e.target.value)} placeholder="https://minecrack.example.com" />
+              </label>
+              <label>ID del modpack
+                <input className="isettings-input" type="number" min="1" value={modpackId} onChange={e => setModpackId(e.target.value)} />
+              </label>
+              <label>Seguimiento
+                <select className="isettings-input" value={tracking} onChange={e => setTracking(e.target.value)}>
+                  <option value="active">Seguir release activa</option>
+                  <option value="pinned">Fijar una release</option>
+                </select>
+              </label>
+              {tracking === 'pinned' && <label>ID de release
+                <input className="isettings-input" type="number" min="1" value={releaseId} onChange={e => setReleaseId(e.target.value)} />
+              </label>}
+              <div className="isettings-hint">Los JARs que no pertenezcan al manifiesto se moverán a una carpeta de cuarentena recuperable.</div>
+            </div>}
+            {remoteError && <div className="isettings-remote-error">{remoteError}</div>}
           </div>
 
           {/* Zona de peligro */}

@@ -8,6 +8,8 @@ use flate2::read::GzDecoder;
 use tar::Archive as TarArchive;
 use chrono::Utc;
 
+mod sync;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Estructuras compartidas JS ↔ Rust
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2629,6 +2631,8 @@ pub fn run() {
             import_instance_from_folder,
             import_instance_from_zip,
             read_file_base64,
+            sync::sync_instance,
+            sync::restore_quarantine,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

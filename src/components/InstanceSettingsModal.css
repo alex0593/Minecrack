@@ -210,3 +210,14 @@
   font-size: 13px;
   color: var(--text-secondary);
 }
+.isettings-remote-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.isettings-remote-toggle input { width: auto; }
+.isettings-remote-grid { display: grid; gap: 10px; margin-top: 12px; }
+.isettings-remote-grid label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 12px; }
+.isettings-remote-error { color: var(--red); font-size: 12px; margin-top: 8px; }

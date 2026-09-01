@@ -1,0 +1,2 @@
+"""Minecrack ecosystem API."""
+

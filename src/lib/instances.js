@@ -17,6 +17,10 @@ export function createInstance({ name, version, loader, loaderVersion, icon }) {
     lastPlayed: null,
     playtime: 0,   // segundos
     modsCount: 0,
+    remoteModpack: null,
+    lastSyncedReleaseId: null,
+    lastSyncAt: null,
+    lastSyncStatus: null,
   };
 }
 

@@ -6,12 +6,14 @@ import { listMods, deleteMod, toggleMod, getLauncherDir, exportInstanceMods, imp
   listResourcePacks, addResourcePack, deleteResourcePack,
   listShaderPacks, addShaderPack, deleteShaderPack,
   pickFile,
+  restoreQuarantine,
 } from '../lib/tauri';
 import { formatPlaytime, formatRelativeTime, formatLogTime } from '../lib/format';
 import ImportModsModal from './ImportModsModal';
 import ExportInstanceModal from './ExportInstanceModal';
 import SettingsPage from './SettingsPage';
 import ModpackImportWizard from './ModpackImportWizard';
+import { synchronizeInstance } from '../lib/ecosystem-sync';
 
 /* ─── Helpers ─────────────────────────────────── */
 const fmtModVersion = (v) =>
@@ -809,6 +811,9 @@ function escapeRegex(s) {
 function InstanceDetail({ instance }) {
   const [activeTab, setActiveTab] = useState('mods');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(null);
+  const syncPromiseRef = useRef(null);
   const { state, dispatch, openModal } = useStore();
 
   // Ctrl+` abre la consola
@@ -826,6 +831,37 @@ function InstanceDetail({ instance }) {
 
   const isThisRunning = gameRunning && gameInstanceId === instance.id;
 
+  const runSync = async () => {
+    if (!instance.remoteModpack) return null;
+    if (syncPromiseRef.current) return syncPromiseRef.current;
+    const promise = (async () => {
+      setSyncing(true);
+      setSyncProgress({ phase: 'manifest', label: 'Consultando manifiesto…', percent: 0 });
+      try {
+        const result = await synchronizeInstance(instance, setSyncProgress);
+        dispatch({ type: 'UPDATE_INSTANCE', payload: {
+          id: instance.id,
+          lastSyncedReleaseId: result.releaseId,
+          lastSyncAt: new Date().toISOString(),
+          lastSyncStatus: 'ready',
+          lastQuarantinePath: result.quarantinePath ?? null,
+        }});
+        const launcherDir = await getLauncherDir();
+        const mods = await listMods(launcherDir, instance.id);
+        dispatch({ type: 'SET_INSTANCE_MODS', payload: mods });
+        return result;
+      } catch (error) {
+        dispatch({ type: 'UPDATE_INSTANCE', payload: { id: instance.id, lastSyncStatus: 'error' } });
+        throw error;
+      } finally {
+        setSyncing(false);
+        syncPromiseRef.current = null;
+      }
+    })();
+    syncPromiseRef.current = promise;
+    return promise;
+  };
+
   // Cargar mods cuando la instancia se selecciona
   useEffect(() => {
     const loadMods = async () => {
@@ -840,7 +876,17 @@ function InstanceDetail({ instance }) {
     loadMods();
   }, [instance.id, dispatch]);
 
-  const handlePlay = () => {
+  useEffect(() => {
+    if (!instance.remoteModpack) return;
+    runSync().catch(error => {
+      console.error('[EcosystemSync] Error:', error);
+      setSyncProgress({ phase: 'error', label: error?.message || String(error), percent: 0 });
+    });
+  // Solo repetir si cambia el vínculo remoto o se selecciona otra instancia.
+  }, [instance.id, instance.remoteModpack?.apiBaseUrl, instance.remoteModpack?.modpackId,
+    instance.remoteModpack?.tracking, instance.remoteModpack?.releaseId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePlay = async () => {
     if (isThisRunning) {
       dispatch({ type: 'SET_GAME_RUNNING', payload: { running: false } });
       return;
@@ -854,6 +900,15 @@ function InstanceDetail({ instance }) {
         instanceId:   instance.id,
       });
       return;
+    }
+
+    if (instance.remoteModpack) {
+      try {
+        await runSync();
+      } catch (error) {
+        dispatch({ type: 'SET_ERROR', payload: `No se puede jugar hasta completar la sincronización: ${error?.message || error}` });
+        return;
+      }
     }
 
     dispatch({ type: 'SET_GAME_RUNNING', payload: { running: true, instanceId: instance.id } });
@@ -889,6 +944,11 @@ function InstanceDetail({ instance }) {
                   Jugando
                 </span>
               )}
+              {instance.remoteModpack && (
+                <span className={`status-pill ${instance.lastSyncStatus === 'ready' ? 'status-pill-running' : ''}`}>
+                  ☁ {syncing ? 'Sincronizando' : instance.lastSyncStatus === 'ready' ? `Release ${instance.lastSyncedReleaseId}` : 'Remoto'}
+                </span>
+              )}
             </div>
             <div className="hero-meta">
               <span className="hero-meta-item" title="Tiempo total jugado">
@@ -906,6 +966,27 @@ function InstanceDetail({ instance }) {
             </div>
           </div>
           <div className="instance-hero-actions">
+            {!instance.remoteModpack && instance.lastQuarantinePath && <button
+              className="btn btn-ghost"
+              onClick={async () => {
+                try {
+                  const launcherDir = await getLauncherDir();
+                  const restored = await restoreQuarantine(launcherDir, instance.id, instance.lastQuarantinePath);
+                  dispatch({ type: 'UPDATE_INSTANCE', payload: { id: instance.id, lastQuarantinePath: null } });
+                  dispatch({ type: 'SET_INSTANCE_MODS', payload: await listMods(launcherDir, instance.id) });
+                  setSyncProgress({ phase: 'done', label: `${restored} archivo(s) restaurado(s)`, percent: 100 });
+                } catch (error) {
+                  dispatch({ type: 'SET_ERROR', payload: error?.message || String(error) });
+                }
+              }}
+              title="Restaurar última cuarentena"
+            >↩</button>}
+            {instance.remoteModpack && <button
+              className="btn btn-ghost"
+              onClick={() => runSync().catch(error => dispatch({ type: 'SET_ERROR', payload: error?.message || String(error) }))}
+              disabled={syncing || isThisRunning}
+              title="Sincronizar modpack oficial"
+            >☁</button>}
             <button
               id="btn-verify-instance"
               className="btn btn-ghost"
@@ -933,15 +1014,24 @@ function InstanceDetail({ instance }) {
                 animation: 'none',
               } : {}}
               onClick={handlePlay}
+              disabled={syncing}
             >
               <span className="btn-play-icon">
-                {isThisRunning ? '⏹' : instance.installed ? '▶' : '⬇'}
+                {syncing ? '↻' : isThisRunning ? '⏹' : instance.installed ? '▶' : '⬇'}
               </span>
-              {isThisRunning ? 'Detener' : instance.installed ? 'Jugar' : 'Instalar'}
+              {syncing ? 'Sincronizando' : isThisRunning ? 'Detener' : instance.installed ? 'Jugar' : 'Instalar'}
             </button>
           </div>
         </div>
       </div>
+
+      {instance.remoteModpack && syncProgress && (
+        <div className={`ecosystem-sync ${syncProgress.phase === 'error' ? 'error' : ''}`}>
+          <div><strong>{syncProgress.phase === 'done' ? '✓ Modpack listo' : 'Sincronización oficial'}</strong><span>{syncProgress.label}</span></div>
+          <div className="ecosystem-sync-track"><div style={{ width: `${Math.max(0, Math.min(100, syncProgress.percent ?? 0))}%` }} /></div>
+          <span>{Math.round(syncProgress.percent ?? 0)}%</span>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="instance-tabs">

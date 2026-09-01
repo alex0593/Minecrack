@@ -266,6 +266,19 @@ export async function tauriCmd(command, args = {}) {
   }
 }
 
+/**
+ * IPC estricto para operaciones que nunca pueden simular éxito.
+ * A diferencia de tauriCmd, propaga errores nativos y falla en modo navegador.
+ */
+export async function tauriStrictCmd(command, args = {}) {
+  if (!IS_TAURI) {
+    throw new Error(`${command} solo está disponible en la aplicación de escritorio`);
+  }
+  const invoke = await getTauriInvoke();
+  if (!invoke) throw new Error('El puente nativo de Tauri no está disponible');
+  return invoke(command, args);
+}
+
 // ─── listen ──────────────────────────────────────────────────────────────────
 export async function tauriListen(event, handler) {
   if (!IS_TAURI) {
@@ -564,6 +577,14 @@ export const removeDir = (path) =>
 /** Copia un directorio recursivamente; no-op si src no existe */
 export const copyDir = (src, dst) =>
   tauriCmd('copy_dir', { src, dst });
+
+/** Sincroniza una instancia vinculada con su release oficial. */
+export const syncInstance = (args) =>
+  tauriStrictCmd('sync_instance', args);
+
+/** Restaura JARs de una cuarentena después de desvincular la instancia. */
+export const restoreQuarantine = (launcherDir, instanceId, quarantinePath) =>
+  tauriStrictCmd('restore_quarantine', { launcherDir, instanceId, quarantinePath });
 
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -68,7 +68,7 @@ export default function ConsoleTab() {
 
   function clearAll() {
     if (gameRunning) return;
-    dispatch({ type: 'SET_GAME_RUNNING', payload: { running: false } });
+    dispatch({ type: 'CLEAR_GAME_LOGS' });
   }
 
   // Highlight de matches dentro de una línea

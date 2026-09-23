@@ -1,0 +1,103 @@
+/* Step3Config.css - Estilos del Paso 3: configuracion de la instancia */
+
+/* ─── Step 3: Configuration ────────────────────────────────────────────────── */
+.wizard-step-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+}
+
+.wizard-step-config h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.wizard-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.wizard-form-group label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.wizard-form-group input,
+.wizard-form-group select,
+.wizard-form-group textarea {
+  padding: var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.wizard-form-group input:focus,
+.wizard-form-group select:focus,
+.wizard-form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.1);
+}
+
+.wizard-icon-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--gap-sm);
+}
+
+.wizard-icon-btn {
+  aspect-ratio: 1;
+  background: var(--bg-base);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wizard-icon-btn:hover {
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+.wizard-icon-btn.selected {
+  border-color: var(--accent);
+  background: rgba(0, 230, 118, 0.1);
+}
+
+.wizard-config-info {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--gap-md);
+  font-size: 13px;
+}
+
+.wizard-config-info strong {
+  color: var(--text-primary);
+}
+
+.wizard-config-info p {
+  margin: var(--gap-xs) 0;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .wizard-icon-picker {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .wizard-icon-picker {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

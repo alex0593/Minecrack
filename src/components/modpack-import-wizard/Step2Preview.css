@@ -1,0 +1,166 @@
+/* Step2Preview.css - Estilos del Paso 2: vista previa del modpack */
+
+/* ─── Step 2: Preview ──────────────────────────────────────────────────────── */
+.wizard-step-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+}
+
+.wizard-step-preview h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.wizard-preview-header {
+  display: flex;
+  gap: var(--gap-lg);
+  background: var(--bg-base);
+  padding: var(--gap-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.wizard-preview-icon {
+  width: 160px;
+  height: 160px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.wizard-preview-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.wizard-preview-info h3 {
+  margin: 0 0 var(--gap-sm) 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.wizard-preview-author {
+  margin: 0 0 var(--gap-md) 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.wizard-preview-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wizard-version-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.wizard-version-selector label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.wizard-version-selector select {
+  padding: var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* ─── Compact Mode (Preview Step) ──────────────────────────────────────────── */
+.wizard-step-preview.compact {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: var(--gap-lg);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.wizard-step-preview.compact h2 {
+  margin: 0 0 var(--gap-lg) 0;
+  font-size: 16px;
+}
+
+.wizard-step-preview.compact .wizard-preview-header {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--gap-md);
+  gap: var(--gap-md);
+  border: none;
+  background: transparent;
+}
+
+.wizard-step-preview.compact .wizard-preview-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0;
+}
+
+.wizard-step-preview.compact .wizard-preview-info h3 {
+  margin: 0 0 var(--gap-xs) 0;
+  font-size: 14px;
+}
+
+.wizard-step-preview.compact .wizard-preview-author {
+  margin: 0 0 var(--gap-xs) 0;
+  font-size: 12px;
+}
+
+.wizard-step-preview.compact .wizard-preview-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wizard-step-preview.compact .wizard-version-selector {
+  gap: var(--gap-xs);
+  margin: var(--gap-lg) 0 0 0;
+}
+
+.wizard-step-preview.compact .wizard-version-selector label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.wizard-step-preview.compact .wizard-version-selector select {
+  padding: var(--gap-sm) var(--gap-md);
+  font-size: 13px;
+}
+
+.wizard-step-preview.compact .wizard-button-group {
+  gap: var(--gap-sm);
+  margin-top: var(--gap-lg);
+}
+
+.wizard-step-preview.compact .btn {
+  padding: var(--gap-sm) var(--gap-md);
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .wizard-preview-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .wizard-preview-icon {
+    width: 120px;
+    height: 120px;
+  }
+}

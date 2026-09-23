@@ -25,10 +25,16 @@ const _assetCache   = new Map();
 export async function getVersionManifest() {
   if (_manifestCache) return _manifestCache;
 
+  if (!API.MOJANG.VERSION_MANIFEST) {
+    throw new Error('URL del manifest de Mojang no configurada');
+  }
   const res = await fetch(API.MOJANG.VERSION_MANIFEST);
   if (!res.ok) throw new Error(`Error ${res.status} al obtener el manifest de Mojang`);
 
   _manifestCache = await res.json();
+  if (!Array.isArray(_manifestCache.versions)) {
+    throw new Error('El manifest de Mojang tiene un formato inválido');
+  }
   return _manifestCache;
 }
 
@@ -52,6 +58,7 @@ export async function getVersionData(versionId) {
   const entry = manifest.versions.find(v => v.id === versionId);
   if (!entry) throw new Error(`Versión ${versionId} no encontrada en el manifest`);
 
+  if (!entry.url) throw new Error(`La versión ${versionId} no tiene URL de metadatos`);
   const res = await fetch(entry.url);
   if (!res.ok) throw new Error(`Error ${res.status} al obtener datos de versión ${versionId}`);
 
@@ -65,6 +72,7 @@ export async function getVersionData(versionId) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getAssetIndex(assetIndexInfo) {
   const { id, url } = assetIndexInfo;
+  if (!id || !url) throw new Error('La versión no contiene un asset index válido');
   if (_assetCache.has(id)) return _assetCache.get(id);
 
   const res = await fetch(url);
@@ -114,9 +122,10 @@ export async function buildDownloadList(versionId, launcherDir) {
     // Verificar reglas (ej: solo Windows, solo Linux)
     if (!isLibraryAllowed(lib)) continue;
 
-    // Native library (LWJGL, etc. para la plataforma)
-    const nativeClassifier = getNativeClassifier();
-    if (nativeClassifier && lib.downloads?.classifiers?.[nativeClassifier]) {
+    // Native library (LWJGL, etc. para la plataforma). El JAR normal también
+    // es necesario en el classpath; ambos artefactos deben conservarse.
+    const nativeClassifier = getNativeClassifier(lib.downloads?.classifiers);
+    if (nativeClassifier) {
       const nativeArtifact = lib.downloads.classifiers[nativeClassifier];
       tasks.push({
         url:    nativeArtifact.url,
@@ -127,7 +136,6 @@ export async function buildDownloadList(versionId, launcherDir) {
         isNative: true,  // Marcar para extracción posterior
         extractTo: `${launcherDir}/instances/{instanceId}/natives`,  // Placeholder
       });
-      continue;  // No procesar el JAR si hay native
     }
 
     // JAR normal
@@ -145,6 +153,9 @@ export async function buildDownloadList(versionId, launcherDir) {
 
   // 4. Asset index JSON
   const assetIndexInfo = versionData.assetIndex;
+  if (!assetIndexInfo?.url || !assetIndexInfo?.id) {
+    throw new Error(`La versión ${versionId} no contiene un asset index descargable`);
+  }
   tasks.push({
     url:   assetIndexInfo.url,
     dest:  `${assetsDir}/indexes/${assetIndexInfo.id}.json`,
@@ -165,7 +176,14 @@ export async function buildAssetDownloadList(assetIndexInfo, launcherDir) {
   const assetsDir = `${launcherDir}/assets`;
   const tasks = [];
 
+  if (!index?.objects || typeof index.objects !== 'object') {
+    throw new Error(`El asset index ${assetIndexInfo.id} tiene un formato inválido`);
+  }
+
   for (const [name, obj] of Object.entries(index.objects)) {
+    if (!obj?.hash || !/^[a-f0-9]{40}$/i.test(obj.hash)) {
+      throw new Error(`Asset inválido en ${assetIndexInfo.id}: ${name}`);
+    }
     const hash    = obj.hash;
     const prefix  = hash.slice(0, 2);
     const url     = `${API.MOJANG.ASSETS_BASE}/${prefix}/${hash}`;
@@ -300,26 +318,19 @@ function ruleMatches(rule) {
  * Obtiene el classifier correcto para natives según la plataforma
  * Ej: "natives-windows", "natives-linux", "natives-macos", "natives-windows-x86"
  */
-function getNativeClassifier() {
+function getNativeClassifier(classifiers = {}) {
   const platform = navigator.platform.toLowerCase();
-  const arch = navigator.userAgentData?.platform?.includes('64') ? '64' : '32';
+  const isArm = navigator.userAgentData?.architecture?.toLowerCase?.().includes('arm') ||
+    navigator.userAgent?.toLowerCase().includes('aarch64');
+  const candidates = platform.includes('win')
+    ? ['natives-windows', 'natives-windows-x64', 'natives-windows-x86_64']
+    : platform.includes('mac')
+      ? (isArm ? ['natives-macos-arm64', 'natives-macos', 'natives-macos-x64']
+        : ['natives-macos', 'natives-macos-x64', 'natives-macos-arm64'])
+      : platform.includes('lin')
+        ? (isArm ? ['natives-linux-arm64', 'natives-linux', 'natives-linux-x64']
+          : ['natives-linux', 'natives-linux-x64', 'natives-linux-arm64'])
+        : [];
 
-  if (platform.includes('win')) {
-    // Windows: natives-windows-x64 o natives-windows (legacy)
-    return `natives-windows${arch === '64' ? '-x64' : ''}`;
-  }
-  if (platform.includes('mac')) {
-    // macOS: natives-macos, natives-macos-x64, natives-macos-arm64
-    if (arch === '64') {
-      // Intentar arm64 primero (Apple Silicon), fallback a x64
-      return 'natives-macos-arm64';  // O 'natives-macos-x64' como fallback
-    }
-    return 'natives-macos';
-  }
-  if (platform.includes('lin')) {
-    // Linux: natives-linux, natives-linux-x64
-    return `natives-linux${arch === '64' ? '-x64' : ''}`;
-  }
-
-  return null;
+  return candidates.find(name => classifiers?.[name]) ?? null;
 }

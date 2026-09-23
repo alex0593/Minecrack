@@ -31,6 +31,9 @@ export function downloadQueue({ tasks, onProgress, onError, onDone, concurrency 
 
   async function processTask(task) {
     try {
+      if (!task.url && !task.content) {
+        throw new Error(`Tarea sin URL ni contenido: ${task.label}`);
+      }
       // Archivos sin URL se escriben desde content (ej: version JSON)
       if (!task.url && task.content) {
         await writeFile(task.dest, task.content);
@@ -109,6 +112,9 @@ export async function installVersion(versionId, launcherDir, instance, onProgres
 
   // 1. Construir lista de archivos (client.jar + libraries + version JSON)
   const { tasks, versionData, assetIndexInfo } = await buildDownloadList(versionId, launcherDir);
+  if (tasks.length === 0) {
+    throw new Error(`No se encontraron archivos descargables para Minecraft ${versionId}`);
+  }
 
   // 2. Descargar archivos base
   await new Promise((resolve, reject) => {

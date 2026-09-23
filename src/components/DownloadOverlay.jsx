@@ -138,7 +138,7 @@ export default function DownloadOverlay({ versionId, instanceName, onDone, onCan
 
         setPhase('done');
         setFinished(true);
-        setTimeout(() => onDone?.(launcherDir, versionData, loaderVersion), 1000);
+        setTimeout(() => onDone?.(launcherDir, versionData, loaderVersion, actualGameVersion || versionId), 1000);
 
       } catch (err) {
         setErrors(prev => [...prev, {

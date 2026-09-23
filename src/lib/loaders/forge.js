@@ -335,6 +335,13 @@ export async function installForge(gameVersion, loaderVersion, launcherDir, vers
       selectedVersion = KNOWN_FORGE_VERSIONS['1.20.1'];
     }
 
+    // Nunca generar un perfil Forge que herede de otra versión de Minecraft:
+    // dejaría la instalación aparentemente completa, pero imposible de lanzar.
+    const selectedGameVersion = selectedVersion.split('-')[0];
+    if (selectedGameVersion !== gameVersion) {
+      throw new Error(`Forge no está disponible para MC ${gameVersion}; no se instalará el perfil de ${selectedGameVersion}`);
+    }
+
     console.log(`[Forge] Instalando versión ${selectedVersion} para MC ${gameVersion}`);
 
     // ── Obtener datos reales de Prism Meta ──────────────────────────────────

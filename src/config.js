@@ -16,9 +16,12 @@ export const API = {
 
   /** Mojang — versiones del juego y assets */
   MOJANG: {
-    VERSION_MANIFEST: import.meta.env.VITE_MOJANG_VERSION_MANIFEST,
-    ASSETS_BASE:      import.meta.env.VITE_MOJANG_ASSETS_BASE,
-    LIBRARIES_BASE:   import.meta.env.VITE_MOJANG_LIBRARIES_BASE,
+    VERSION_MANIFEST: import.meta.env.VITE_MOJANG_VERSION_MANIFEST ||
+      'https://launchermeta.mojang.com/mc/game/version_manifest_v2.json',
+    ASSETS_BASE:      import.meta.env.VITE_MOJANG_ASSETS_BASE ||
+      'https://resources.download.minecraft.net',
+    LIBRARIES_BASE:   import.meta.env.VITE_MOJANG_LIBRARIES_BASE ||
+      'https://libraries.minecraft.net',
   },
 
   /**
@@ -46,24 +49,24 @@ export const API = {
 
   /** Fabric mod loader */
   FABRIC: {
-    META:            import.meta.env.VITE_FABRIC_META_BASE,
-    MAVEN:           import.meta.env.VITE_FABRIC_MAVEN_BASE,
+    META:            import.meta.env.VITE_FABRIC_META_BASE || 'https://meta.fabricmc.net/v2',
+    MAVEN:           import.meta.env.VITE_FABRIC_MAVEN_BASE || 'https://maven.fabricmc.net',
     /** Versiones del loader para una versión de MC */
     loaderVersions:  (mcVersion) =>
-      `${import.meta.env.VITE_FABRIC_META_BASE}/versions/loader/${mcVersion}`,
+      `${API.FABRIC.META}/versions/loader/${mcVersion}`,
     /** Perfil de lanzamiento listo para usar */
     launchProfile:   (mcVersion, loaderVersion) =>
-      `${import.meta.env.VITE_FABRIC_META_BASE}/versions/loader/${mcVersion}/${loaderVersion}/profile/json`,
+      `${API.FABRIC.META}/versions/loader/${mcVersion}/${loaderVersion}/profile/json`,
   },
 
   /** Quilt mod loader */
   QUILT: {
-    META:            import.meta.env.VITE_QUILT_META_BASE,
-    MAVEN:           import.meta.env.VITE_QUILT_MAVEN_BASE,
+    META:            import.meta.env.VITE_QUILT_META_BASE || 'https://meta.quiltmc.org/v3',
+    MAVEN:           import.meta.env.VITE_QUILT_MAVEN_BASE || 'https://maven.quiltmc.org',
     loaderVersions:  (mcVersion) =>
-      `${import.meta.env.VITE_QUILT_META_BASE}/versions/loader/${mcVersion}`,
+      `${API.QUILT.META}/versions/loader/${mcVersion}`,
     launchProfile:   (mcVersion, loaderVersion) =>
-      `${import.meta.env.VITE_QUILT_META_BASE}/versions/loader/${mcVersion}/${loaderVersion}/profile/json`,
+      `${API.QUILT.META}/versions/loader/${mcVersion}/${loaderVersion}/profile/json`,
   },
 
   /** Forge — Maven */

@@ -106,10 +106,11 @@ function Modals() {
       versionId={modalData?.versionId}
       instanceName={modalData?.instanceName}
       instanceId={modalData?.instanceId}
-      onDone={(launcherDir, versionData, loaderVersion) => {
+      onDone={(launcherDir, versionData, loaderVersion, actualVersion) => {
         dispatch({ type: 'UPDATE_INSTANCE', payload: {
           id: modalData?.instanceId,
           installed: true,
+          version: actualVersion || modalData?.versionId,
           launcherDir,
           loaderVersion,
         }});

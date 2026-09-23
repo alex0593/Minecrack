@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store';
 import { createInstance, POPULAR_VERSIONS, LOADERS } from '../lib/instances';
+import { listVersions } from '../lib/mojang';
 import { getCompatibleLoaderVersions, getLatestCompatibleVersion, isLoaderAvailable } from '../lib/loaders/versions';
 import Select from './ui/Select';
 
@@ -14,6 +15,7 @@ export default function NewInstanceModal() {
   const [name, setName] = useState(prefill?.name ?? '');
   const [icon, setIcon] = useState('⛏');
   const [version, setVersion] = useState(prefill?.version ?? '');
+  const [minecraftVersions, setMinecraftVersions] = useState(POPULAR_VERSIONS);
   const [loader, setLoader] = useState(prefill?.loader ?? 'vanilla');
   const [loaderVersion, setLoaderVersion] = useState('latest');
   const [versionMode, setVersionMode] = useState('latest'); // 'latest' o 'specific'
@@ -22,6 +24,19 @@ export default function NewInstanceModal() {
   const [availableVersions, setAvailableVersions] = useState({});
   const [loadingVersions, setLoadingVersions] = useState({});
   const [loaderCompatibility, setLoaderCompatibility] = useState({});
+
+  // Mojang es la fuente de verdad para releases. POPULAR_VERSIONS mantiene la
+  // UI útil mientras carga la red y sirve como fallback si la API no responde.
+  useEffect(() => {
+    let active = true;
+    listVersions(['release'])
+      .then(versions => {
+        if (!active || !versions?.length) return;
+        setMinecraftVersions(versions.map(v => v.id));
+      })
+      .catch(error => console.warn('[NewInstance] No se pudieron cargar releases:', error));
+    return () => { active = false; };
+  }, []);
 
   // Precargar disponibilidad de loaders cuando llega al paso 2
   useEffect(() => {
@@ -176,7 +191,7 @@ export default function NewInstanceModal() {
                 onChange={setVersion}
                 placeholder="— Selecciona una versión —"
                 searchable
-                options={POPULAR_VERSIONS.map(v => ({ value: v, label: v }))}
+                options={minecraftVersions.map(v => ({ value: v, label: v }))}
               />
             </div>
           </div>

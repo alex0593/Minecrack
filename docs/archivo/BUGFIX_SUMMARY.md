@@ -45,9 +45,8 @@ await downloadFile(downloadUrl, jarPath, expectedSha1, `client-${version}.jar`);
 ## CurseForge API Key
 
 **Status:** ✅ Configured in `.env`
-```
-VITE_CURSEFORGE_API_KEY=$2a$10$17QRfpCp2L3qim5Yz5.b6.HrJOWLAgNWCmZ6zlsZjm1xttQFqhbcO
-```
+
+> ⚠️ **Nota de seguridad (2026-09-23):** Esta clave estaba expuesta en texto plano en este archivo y ya está en el historial de git. **Rótala en https://console.curseforge.com** y usa el `.env` local (nunca commiteado) para la nueva.
 
 ## Next Steps
 

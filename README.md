@@ -80,18 +80,37 @@ Minecrack/
 
 ### Comandos Disponibles
 
-- `npm run dev`: Inicia el servidor de desarrollo de Vite y la ventana de Tauri.
-- `npm run build`: Genera el ejecutable nativo para tu sistema operativo.
+- `npm run dev`: Inicia solo el servidor de Vite (modo navegador, sin ventana Tauri).
+- `npm run tauri dev`: Abre la app de escritorio completa (Vite + backend Rust).
+- `npm run build`: Genera el bundle del frontend (solo Vite).
+- `npm run tauri build`: Genera el ejecutable nativo para tu sistema operativo.
 - `npm run tauri`: Acceso directo al CLI de Tauri.
-- `npm run test`: Ejecuta la suite de pruebas unitarias con Vitest.
+- `npm test`: Ejecuta la suite de pruebas unitarias con Vitest.
+
+### Ecosistema (backend + panel admin)
+
+El repo incluye además una API oficial de modpacks y su panel de administración:
+
+```bash
+cp backend/.env.example backend/.env   # rellena secretos
+docker compose up --build              # API en :8000 (OpenAPI en /docs), panel admin en :8080
+cd admin && npm install && npm run dev # panel en desarrollo, puerto 1421 (proxy /api → :8000)
+```
+
+El lanzador se sincroniza con esta API por instancia (`remoteModpack`); operaciones y rollback en [`backend/OPERATIONS.md`](./backend/OPERATIONS.md).
 
 ---
 
 
 ## 📚 Documentación de Desarrollo
 
+- **Roadmap y estado:**
+  - [`ROADMAP.md`](./ROADMAP.md): qué está hecho, en curso y pendiente.
 - **Arquitectura y Proyecto:**
-  - [`CLAUDE.md`](./CLAUDE.md): Guía principal de arquitectura, IPC (React-Rust), manejo de estado global y el estado actual de implementaciones (Fase 4).
+  - [`CLAUDE.md`](./CLAUDE.md): Guía principal de arquitectura, IPC (React-Rust), manejo de estado global y ecosistema.
+  - [`AGENTS.md`](./AGENTS.md): Comandos exactos y gotchas para agentes de código.
+- **Históricos:**
+  - [`docs/archivo/`](./docs/archivo/): notas de implementación y migraciones antiguas (obsoletas).
 
 ---
 

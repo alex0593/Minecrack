@@ -9,8 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev        # Start Vite dev server (port 1420) + Tauri dev window
-npm run build      # Production build (Vite + Tauri native bundle)
+npm run dev        # Browser-only Vite dev server (port 1420) — no Tauri window
+npm run tauri dev  # Full desktop app (Vite + Rust backend)
+npm run build      # Frontend bundle only (Vite); `npm run tauri build` for the native bundle
 npm run tauri      # Direct tauri CLI access
 npm run test       # Run Vitest test suite (jsdom environment)
 npm run test:watch # Vitest in watch mode
@@ -27,6 +28,15 @@ cargo build   # Compile Rust backend
 cargo test    # Run Rust unit tests
 cargo check   # Fast type-check without full compilation
 ```
+
+## Ecosystem (backend + admin)
+
+The repo also hosts the official modpack ecosystem, separate from the launcher:
+
+- `backend/` — FastAPI + SQLModel API on Postgres. Run from the repo root: `cp backend/.env.example backend/.env`, then `docker compose up --build` (API on `:8000`, OpenAPI at `/docs`; the container runs `alembic upgrade head` on start). Tests: `cd backend && pytest` (self-contained, no Postgres needed). Ops/release model: `backend/OPERATIONS.md`.
+- `admin/` — standalone Vite React panel: `cd admin && npm install && npm run dev` (port 1421, proxies `/api` to `localhost:8000`).
+
+Launcher ↔ ecosystem: an instance may carry `remoteModpack { apiBaseUrl, modpackId, tracking: 'active' | 'pinned', releaseId? }`, validated in `src/lib/ecosystem-sync.js` (HTTPS required, HTTP only for localhost). The Rust `sync_instance` command (in `src-tauri/src/sync.rs`) reports progress via `sync://progress` events. Sync calls use `tauriStrictCmd` (throws on failure) instead of the mock-fallback `tauriCmd`.
 
 ## Architecture
 

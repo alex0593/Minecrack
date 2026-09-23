@@ -22,7 +22,7 @@
 
 ## 📋 Prioridad alta
 
-1. **CI con GitHub Actions** (no existe ningún workflow): en cada push/PR ejecutar `npm test` + `cd src-tauri && cargo check && cargo test` + `cd backend && pytest`. El incidente del 2026-09-23 (refactor que no compilaba) se habría detectado automáticamente.
+1. ~~**CI con GitHub Actions**~~ ✅ **Listo (2026-09-23)** — `.github/workflows/ci.yml`: Vitest + build, pytest (Python 3.13), `cargo fmt/check/test` en cada push/PR. Primer run verde: https://github.com/alex0593/Minecrack/actions/runs/35915478452
 2. **Completar checklist manual** de [`docs/archivo/IMPLEMENTATION_STATUS.md`](./docs/archivo/IMPLEMENTATION_STATUS.md) (modpack wizard con ambos orígenes, los 5 loaders, skins, indicadores de progreso).
 3. **Piloto del ecosistema** antes de despliegue general (de `backend/OPERATIONS.md`): instancia Fabric pequeña; verificar actualización, JAR corrupto, JAR adicional, interrupción de red y rollback.
 4. **Publicar v1.3.2** con el refactor ya commiteado y CI activo.

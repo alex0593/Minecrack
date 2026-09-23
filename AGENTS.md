@@ -15,7 +15,7 @@ Launcher (run from repo root):
 - `npm run dev` starts the browser-only Vite server on port 1420 (strict). It does **not** open the Tauri window — use `npm run tauri dev` for the full desktop app.
 - `npm run build` produces the frontend bundle only; `npm run tauri build` creates the native production bundle.
 - `npm test` runs the Vitest suite once; `npm run test:watch` reruns affected tests; `npx vitest run src/test/instances.test.js` runs one file.
-- `cd src-tauri && cargo check` quickly validates Rust changes; `cargo test` for Rust tests; `cargo fmt --check` before committing Rust work.
+- `cd src-tauri && cargo check` quickly validates Rust changes; `cargo test` for Rust tests; `cargo fmt --check` before committing Rust work (CI enforces it).
 
 Backend:
 
@@ -26,7 +26,7 @@ Admin:
 
 - `cd admin && npm install && npm run dev` — serves on port 1421 and proxies `/api` to `http://localhost:8000`.
 
-No JavaScript linter, formatter, or CI workflow is configured; preserve nearby formatting.
+No JavaScript linter or formatter is configured; preserve nearby formatting. CI runs on every push/PR to `main` (`.github/workflows/ci.yml`): Vitest + `npm run build`, `pytest` from `backend/`, and `cargo fmt --check` + `cargo check` + `cargo test` from `src-tauri/` — keep all four green.
 
 ## IPC & Browser-Dev Gotchas
 

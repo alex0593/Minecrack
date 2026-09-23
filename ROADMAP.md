@@ -27,7 +27,7 @@
 
 Decisiones (2026-09-23): por fases · pulido coherente (mantener ADN oscuro/esmeralda) · paquete final AppImage + deb + rpm. Flujo: rama `feat/ui-refresh`, un PR por fase, CI verde en cada una.
 
-- **Fase 0 — Baseline**: `npm run tauri build` + ejecutar `target/release/tauri-app` con `DISPLAY=:0` + capturas del estado actual como referencia (`gnome-screenshot` disponible).
+- ~~**Fase 0 — Baseline**~~ ✅ **Listo (2026-09-23)** — build release (deb ✅ rpm ✅, AppImage falló por `linuxdeploy`, ver hallazgo 5), app ejecutada y **7 capturas** de referencia en `/tmp/opencode/ui-baseline/`; 5 hallazgos UX (incl. `WebKitWebProcess` al 72 % de CPU con UI muda) documentados en [`docs/ui-baseline.md`](./docs/ui-baseline.md).
 - **Fase 1 — Sistema de diseño**: completar `src/components/ui/` (hoy solo hay ErrorModal, ProgressBar, Select) con Button, Input, Modal, Tabs, Badge, Spinner, Skeleton, Tooltip, Toast, Card sobre los tokens de `src/index.css`. Sin librerías UI externas. Migrar componentes pequeños primero.
 - **Fase 2 — Componentizar gigantes** (sin cambio de comportamiento): `MainPanel.jsx` (1101), `ModpackImportWizard.jsx` (837), `ModpackDownloadModal.jsx` (629), `ModBrowserModal.jsx` (539); dividir CSS de 747/576 líneas. `npm test` verde en cada sub-paso.
 - **Fase 3 — Renovación visual**: jerarquía, espaciado por tokens, focus-visible, skeleton loaders, micro-transiciones 150–200 ms. Orden: shell+sidebar → panel principal → wizards → modales. Verificar con capturas antes/después; mantener el tema claro.

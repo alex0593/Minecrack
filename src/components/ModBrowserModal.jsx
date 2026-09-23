@@ -17,30 +17,45 @@ export default function ModBrowserModal({ instanceId, onClose }) {
   const state    = useStoreState();
   const instance = state.instances.find(i => i.id === instanceId);
 
-  // Guard: Vanilla no soporta mods
+  // Guard: Vanilla no soporta mods. Vive en un componente aparte para que el
+  // número de hooks del explorador no varíe entre renders (rules of hooks):
+  // antes, montar el guard con 1 hook y pasar al explorador con 13+ lanzaba
+  // "Rendered more/fewer hooks than expected".
   if (instance?.loader === 'vanilla') {
-    return (
-      <div className="modbrowser-overlay" onClick={onClose}>
-        <div className="modbrowser-modal modal modal--sm" onClick={e => e.stopPropagation()} style={{ minHeight: 'auto' }}>
-          <div className="modbrowser-header">
-            <h2>📦 Explorar Mods</h2>
-            <button className="modal-close" onClick={onClose}>✕</button>
-          </div>
-          <div style={{ textAlign: 'center', padding: '48px 32px' }}>
-            <div style={{ fontSize: 52, marginBottom: 16 }}>🚫</div>
-            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Vanilla no soporta mods</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-              Para instalar mods necesitas cambiar el loader de la instancia a
-              <strong> Fabric</strong>, <strong>Forge</strong>, <strong>Quilt</strong> o <strong>NeoForge</strong>.
-            </p>
-          </div>
-          <div className="modal-footer" style={{ justifyContent: 'center' }}>
-            <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
-          </div>
+    return <ModBrowserVanillaGuard onClose={onClose} />;
+  }
+  return <ModBrowserContent instanceId={instanceId} onClose={onClose} />;
+}
+
+/** ModBrowserVanillaGuard — aviso «Vanilla no soporta mods» con cierre */
+function ModBrowserVanillaGuard({ onClose }) {
+  return (
+    <div className="modbrowser-overlay" onClick={onClose}>
+      <div className="modbrowser-modal modal modal--sm" onClick={e => e.stopPropagation()} style={{ minHeight: 'auto' }}>
+        <div className="modbrowser-header">
+          <h2>📦 Explorar Mods</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div style={{ textAlign: 'center', padding: '48px 32px' }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>🚫</div>
+          <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Vanilla no soporta mods</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+            Para instalar mods necesitas cambiar el loader de la instancia a
+            <strong> Fabric</strong>, <strong>Forge</strong>, <strong>Quilt</strong> o <strong>NeoForge</strong>.
+          </p>
+        </div>
+        <div className="modal-footer" style={{ justifyContent: 'center' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
+// ─── Explorador completo (montar solo con loader que soporte mods) ───────────
+function ModBrowserContent({ instanceId, onClose }) {
+  const state    = useStoreState();
+  const instance = state.instances.find(i => i.id === instanceId);
 
   // IDs de mods ya instalados para mostrar badge "Instalado"
   const installedIds = (state.instanceMods ?? []).map(m => m.id ?? m.slug ?? m.filename);
@@ -138,7 +153,7 @@ export default function ModBrowserModal({ instanceId, onClose }) {
     return () => clearTimeout(debounceRef.current);
   }, [query, filterVersion, filterLoader, filterSource, filterType]);
 
-  const loadMore = () => doSearch(query, filterVersion, filterLoader, filterSource, filterType, offset + LIMIT);
+  const loadMore = () => doSearch(query, filterVersion, filterLoader, filterType, offset + LIMIT);
 
   return (
     <div className="modbrowser-overlay" onClick={onClose}>

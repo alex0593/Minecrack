@@ -1,0 +1,116 @@
+/* Modal.css — shell de modal sobre los tokens del design system */
+
+.ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gap-lg);
+  background: rgba(0, 0, 0, 0.7);
+  animation: ui-modal-fade 0.15s ease;
+}
+
+.ui-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 2 * var(--gap-lg));
+  background: var(--bg-modal);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  animation: ui-modal-rise 0.2s ease;
+  outline: none;
+}
+
+.ui-modal--sm { max-width: 400px; }
+.ui-modal--md { max-width: 520px; }
+.ui-modal--lg { max-width: 760px; }
+.ui-modal--xl { max-width: 1000px; }
+
+.ui-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--gap-md);
+  padding: var(--gap-lg) var(--gap-lg) var(--gap-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-modal-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ui-modal-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.ui-modal-titles {
+  min-width: 0;
+}
+
+.ui-modal-title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ui-modal-subtitle {
+  margin: 4px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.ui-modal-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.ui-modal-close:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-accent);
+  color: var(--text-primary);
+}
+
+.ui-modal-body {
+  padding: var(--gap-lg);
+  overflow-y: auto;
+}
+
+.ui-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gap-sm);
+  padding: var(--gap-md) var(--gap-lg) var(--gap-lg);
+  border-top: 1px solid var(--border);
+}
+
+@keyframes ui-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-modal-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}

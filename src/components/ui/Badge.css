@@ -1,0 +1,54 @@
+/* Badge.css — píldora de estado */
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.ui-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ui-badge--success {
+  color: var(--accent);
+  background: var(--accent-glow);
+  border-color: var(--border-accent);
+}
+
+.ui-badge--info {
+  color: var(--blue);
+  background: rgba(79, 195, 247, 0.12);
+  border-color: rgba(79, 195, 247, 0.3);
+}
+
+.ui-badge--warning {
+  color: var(--amber);
+  background: rgba(255, 183, 77, 0.12);
+  border-color: rgba(255, 183, 77, 0.3);
+}
+
+.ui-badge--danger {
+  color: var(--red);
+  background: rgba(239, 83, 80, 0.12);
+  border-color: rgba(239, 83, 80, 0.3);
+}
+
+.ui-badge--neutral {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}

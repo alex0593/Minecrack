@@ -1,0 +1,61 @@
+/* Tabs.css — barra de pestañas con subrayado activo (tema esmeralda) */
+
+.ui-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-xs);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.ui-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.ui-tab:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.ui-tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-tab--active {
+  color: var(--text-accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.ui-tab__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ui-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 0 6px;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+}

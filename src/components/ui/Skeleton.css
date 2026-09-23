@@ -1,0 +1,25 @@
+/* Skeleton.css — shimmer de carga */
+
+.ui-skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  width: 100%;
+}
+
+.ui-skeleton {
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 0%,
+    var(--bg-hover) 50%,
+    var(--bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: ui-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes ui-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

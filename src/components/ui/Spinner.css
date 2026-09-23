@@ -1,0 +1,17 @@
+/* Spinner.css — anillo giratorio */
+
+.ui-spinner {
+  display: inline-block;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ui-spinner-rotate 0.7s linear infinite;
+}
+
+.ui-spinner--sm { width: 12px; height: 12px; }
+.ui-spinner--md { width: 18px; height: 18px; }
+.ui-spinner--lg { width: 32px; height: 32px; border-width: 3px; }
+
+@keyframes ui-spinner-rotate {
+  to { transform: rotate(360deg); }
+}

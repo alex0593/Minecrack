@@ -1,0 +1,35 @@
+/* Input.css — envolvente etiqueta/pista/error sobre la clase global .input */
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  font-family: var(--font-sans);
+}
+
+.ui-field__label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ui-field__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.ui-field__error {
+  font-size: var(--fs-xs);
+  color: var(--red);
+  line-height: 1.4;
+}
+
+.ui-input--error {
+  border-color: var(--red) !important;
+}
+
+.ui-input--error:focus {
+  box-shadow: 0 0 0 3px rgba(239, 83, 80, 0.15) !important;
+}

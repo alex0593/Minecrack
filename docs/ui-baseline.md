@@ -28,6 +28,13 @@ la app 1200×760).
    dejaron de responder (retraso de cola de varios segundos; solo un reinicio de la app
    lo resolvió). Sospecha: polling/render de logs o del modal en bucle. Merece
    reproducirse y un `fix:` propio antes o durante la Fase 3.
+   - **Estado (2026-09-23)**: auditoría estática completada (timers, listeners,
+     `useEffect` de los hooks y del store: sin bucles; logs capados a 500). Se corrigió
+     una violación de *rules of hooks* en `ModBrowserModal` (guard de vanilla como
+     early-return antes de 13 hooks → `fix: keep mod browser hook count stable across
+     loaders`), que era clase de crash pero **no explica por sí sola** el bucle de CPU:
+     la causa raíz queda **sin confirmar**; vigilar durante la verificación de la Fase 3
+     y, si reaparece, reproducir con devtools abiertos.
 2. **Cierre inconsistente de modales**:
    - *Nueva instancia*: `×` no cerró; `Esc` solo funcionó cuando el foco **no** estaba en
      un input (el modal autofocusa "Nombre", así que parece roto); `Cancelar` siempre cerró.
@@ -43,6 +50,21 @@ la app 1200×760).
 5. **AppImage no empaqueta** — `npm run tauri build` generó `deb` y `rpm`, pero el paso
    AppImage falló con `failed to run linuxdeploy` (falta `patchelf` en el entorno).
    Resolver en la Fase 5.
+
+## Hallazgos adicionales (post-baseline, descubiertos en la Fase 3)
+
+6. **«Limpiar» de la consola no limpiaba** — el botón despachaba
+   `SET_GAME_RUNNING {running:false}`, que no toca `gameLogs`. **Corregido** con la
+   acción dedicada `CLEAR_GAME_LOGS` (test: `src/test/console-clear.test.jsx`).
+7. **«Cargar más» del navegador de mods desalineado** — `loadMore` pasa `filterType` en
+   el hueco `source` de `doSearch(q, version, loader, source, type, off)`, así que
+   repite la búsqueda con los offsets en el lugar equivocado. Pendiente de `fix:`
+   (candidato a Fase 3).
+8. **Clases de shell de modal sin reglas CSS** — `modal-overlay`, `modal-content`,
+   `modal-header`, `modal-body` no existen en ningún CSS de `src/` (solo
+   `.ui-modal-overlay` de `ui/Modal.css`); modales como `ModpackDownloadModal`,
+   `ExportInstanceModal` o `ImportModsModal` se pintan sin esos estilos. Lo resuelve
+   naturalmente la migración de modales a `<Modal>` en la Fase 3.
 
 ## Regeneración / automatización (también útil en Fase 5)
 

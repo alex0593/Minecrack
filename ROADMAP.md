@@ -11,6 +11,7 @@
   - `admin/` — panel de administración (Vite + React).
   - Sync en el lanzador: `remoteModpack` por instancia, eventos `sync://progress`, validación HTTPS (`src/lib/ecosystem-sync.js`, `src-tauri/src/sync.rs`).
 - **Fixes**: ventanas de consola suprimidas en Windows (`CREATE_NO_WINDOW`), `copy_dir`, filtro de versión MC en el navegador de packs, fallbacks del pack browser.
+- 🔒 **Rotación de API key de CurseForge (2026-09-23)**: la clave vieja estaba en texto plano en `docs/archivo/BUGFIX_SUMMARY.md` (y sigue en el historial de git); se revocó en la consola de CurseForge y la nueva vive solo en `.env` (git-ignored). Lección: una credencial que tocó git se rota en el proveedor, no se borra del archivo.
 - **Refactor Rust compila y está verificado (2026-09-23)**: `lib.rs` → módulos (`archives`, `authority`, `network`, `transfers`, `safe_fs`, `processes`); se corrigieron 4 errores (imports `flate2`/`tar`, lifetimes en `processes.rs`, inferencia en `invoke_handler` con validación `authority`); `cargo fmt` aplicado.
   - Verificación: `cargo check` ✅ · `cargo test` 20/20 ✅ · `npm test` 63/63 ✅ · `pytest` 12/12 ✅.
 
@@ -47,7 +48,6 @@
   - El selector de versión solo muestra las 5 versiones más recientes de Minecraft.
   - `.mrpack` de Modrinth delega la resolución de mods a `NewInstanceModal`.
 - Botón "Reinstalar Forge" explícito en `MainPanel.jsx` (la auto-reparación cubre la mayoría de casos).
-- 🔒 **Seguridad: rotar la API key de CurseForge** — quedó expuesta en texto plano en `docs/archivo/BUGFIX_SUMMARY.md` y está en el historial de git. Rotar en https://console.curseforge.com y guardar la nueva solo en `.env`.
 - Recolección de objetos sin referencias en el almacenamiento del ecosistema (mencionado en `backend/OPERATIONS.md`).
 
 ## 📚 Documentación

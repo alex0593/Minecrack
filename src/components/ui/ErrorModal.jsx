@@ -1,8 +1,12 @@
 import { useState } from 'react';
+import Modal from './Modal';
 import './ErrorModal.css';
 
 /**
  * <ErrorModal> — modal de error con detalles técnicos copiables
+ *
+ * Migrado al shell `<Modal>`: `Esc`, `×` y overlay cierran de forma
+ * consistente (ver `docs/ui-baseline.md` hallazgo 2).
  *
  * @param {object} props
  * @param {string} props.message - mensaje principal de error
@@ -12,8 +16,6 @@ import './ErrorModal.css';
  */
 export default function ErrorModal({ message, details, onClose, open = true }) {
   const [copied, setCopied] = useState(false);
-
-  if (!open) return null;
 
   const handleCopy = async () => {
     const textToCopy = details ? `${message}\n\n${details}` : message;
@@ -27,52 +29,42 @@ export default function ErrorModal({ message, details, onClose, open = true }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content error-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header error-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 24 }}>⚠️</span>
-            <h2>Error</h2>
-          </div>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="modal-body">
-          <div className="error-message">
-            {message}
-          </div>
-
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Error"
+      icon="⚠️"
+      contentClassName="error-modal"
+      headerClassName="error-header"
+      footer={
+        <>
           {details && (
-            <div className="error-details">
-              <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
-                DETALLES TÉCNICOS:
-              </label>
-              <textarea
-                readOnly
-                value={details}
-                className="error-details-textarea"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="modal-footer">
-          {details && (
-            <button
-              className="btn btn-ghost"
-              onClick={handleCopy}
-            >
+            <button className="btn btn-ghost" onClick={handleCopy}>
               {copied ? '✓ Copiado' : '📋 Copiar'}
             </button>
           )}
-          <button
-            className="btn btn-primary"
-            onClick={onClose}
-          >
+          <button className="btn btn-primary" onClick={onClose}>
             Cerrar
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="error-message">
+        {message}
       </div>
-    </div>
+
+      {details && (
+        <div className="error-details">
+          <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+            DETALLES TÉCNICOS:
+          </label>
+          <textarea
+            readOnly
+            value={details}
+            className="error-details-textarea"
+          />
+        </div>
+      )}
+    </Modal>
   );
 }

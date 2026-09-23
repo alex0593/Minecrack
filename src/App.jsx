@@ -16,6 +16,7 @@ import ShaderPackBrowserModal from './components/ShaderPackBrowserModal';
 import InstanceSettingsModal from './components/InstanceSettingsModal';
 import VerifyInstanceModal   from './components/VerifyInstanceModal';
 import SetupWizard           from './components/SetupWizard';
+import { ToastViewport }     from './components/ui/Toast';
 
 function ErrorModal() {
   const { state, dispatch } = useStore();
@@ -229,6 +230,7 @@ export default function App() {
   return (
     <StoreProvider>
       <AppShell />
+      <ToastViewport />
     </StoreProvider>
   );
 }

@@ -1,0 +1,21 @@
+/* Card.css — superficie contenedora */
+
+.ui-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.ui-card--pad-none { padding: 0; }
+.ui-card--pad-sm   { padding: var(--gap-sm); }
+.ui-card--pad-md   { padding: var(--gap-lg); }
+.ui-card--pad-lg   { padding: var(--gap-xl); }
+
+.ui-card--hover {
+  transition: border-color var(--transition), transform var(--transition);
+}
+
+.ui-card--hover:hover {
+  border-color: var(--border-accent);
+  transform: translateY(-1px);
+}

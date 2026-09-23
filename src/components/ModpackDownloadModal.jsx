@@ -17,8 +17,6 @@ import {
   searchModpacks,
   getModpackWithVersions,
   getModpackDownloadUrl,
-  isCurseForgeConfigured,
-  formatModpackInfo,
 } from '../lib/api/curseforge-modpacks';
 import {
   downloadFile,
@@ -30,9 +28,11 @@ import {
   getModsToDownload,
 } from '../lib/tauri';
 import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
-import ProgressBar from './ui/ProgressBar';
-import ErrorModal from './ui/ErrorModal';
 import './ModpackDownloadModal.css';
+import ErrorView from './modpack-download-modal/ErrorView';
+import ProgressView from './modpack-download-modal/ProgressView';
+import PreviewView from './modpack-download-modal/PreviewView';
+import SearchView from './modpack-download-modal/SearchView';
 
 export default function ModpackDownloadModal({ onClose }) {
   const { dispatch } = useDispatch();
@@ -292,14 +292,12 @@ export default function ModpackDownloadModal({ onClose }) {
 
   if (error && step === 'error') {
     return (
-      <ErrorModal
-        message={error.message}
-        details={error.details}
+      <ErrorView
+        error={error}
         onClose={() => {
           setError(null);
           setStep('search');
         }}
-        open
       />
     );
   }
@@ -308,172 +306,35 @@ export default function ModpackDownloadModal({ onClose }) {
 
   if (step === 'downloading' || step === 'installing-mods' || step === 'done') {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content modpack-download-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>
-              {step === 'done'
-                ? '✓ Modpack instalado'
-                : '📥 Instalando modpack'}
-            </h2>
-          </div>
-
-          <div className="modal-body" style={{ paddingTop: 24 }}>
-            {step === 'done' ? (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 12 }}>
-                  ✓
-                </div>
-                <p style={{ color: 'var(--text-primary)', fontSize: 14, margin: 0 }}>
-                  {selectedModpack?.name}
-                </p>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8, margin: 0 }}>
-                  Modpack instalado correctamente
-                </p>
-                {modsDownloaded > 0 && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8, margin: 0 }}>
-                    {modsDownloaded} mod{modsDownloaded === 1 ? '' : 's'} descargado
-                    {modsDownloaded === 1 ? '' : 's'}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <>
-                <ProgressBar
-                  value={progress}
-                  max={100}
-                  label={`${Math.round(progress)}%`}
-                  animated
-                  style={{ marginBottom: 16 }}
-                />
-                <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
-                  {progressLabel}
-                </p>
-                {step === 'installing-mods' && modsToDownload.length > 0 && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 8 }}>
-                    {modsDownloaded}/{modsToDownload.length} mods descargados
-                    {modsFailed > 0 && (
-                      <span style={{ color: 'var(--red)' }}>
-                        ({modsFailed} fallido{modsFailed === 1 ? '' : 's'})
-                      </span>
-                    )}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
-          {step !== 'done' && (
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={onClose} disabled>
-                Por favor espera...
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <ProgressView
+        step={step}
+        selectedModpack={selectedModpack}
+        progress={progress}
+        progressLabel={progressLabel}
+        modsToDownload={modsToDownload}
+        modsDownloaded={modsDownloaded}
+        modsFailed={modsFailed}
+        onClose={onClose}
+      />
     );
   }
 
   // ─── UI: Preview ──────────────────────────────────────────────────────────
 
   if (step === 'previewing' && selectedModpack && selectedVersion) {
-    const info = formatModpackInfo(selectedModpack, selectedVersion);
-
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div
-          className="modal-content modpack-download-modal"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="modal-header">
-            <h2>📦 {selectedModpack.name}</h2>
-            <button className="modal-close" onClick={onClose}>
-              ✕
-            </button>
-          </div>
-
-          <div className="modal-body">
-            {selectedModpack.logo && (
-              <div style={{ marginBottom: 16, textAlign: 'center' }}>
-                <img
-                  src={selectedModpack.logo}
-                  alt={selectedModpack.name}
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '120px',
-                    borderRadius: '4px',
-                  }}
-                />
-              </div>
-            )}
-
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: 14 }}>Descripción</h3>
-              <p
-                style={{
-                  margin: 0,
-                  color: 'var(--text-muted)',
-                  fontSize: 12,
-                  lineHeight: 1.5,
-                }}
-              >
-                {info.description}
-              </p>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 14 }}>Información</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Versión:</span>
-                  <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {info.versionName}
-                  </div>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Tipo:</span>
-                  <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {info.releaseType}
-                  </div>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>MC Versión:</span>
-                  <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {info.gameVersions?.join(', ') || 'No especificada'}
-                  </div>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Tamaño:</span>
-                  <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {formatFileSize(info.fileSize)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="modal-footer">
-            <button
-              className="btn btn-ghost"
-              onClick={() => {
-                setSelectedModpack(null);
-                setSelectedVersion(null);
-                setStep('search');
-              }}
-            >
-              Atrás
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleInstall}
-              disabled={loading}
-            >
-              📥 Descargar e instalar
-            </button>
-          </div>
-        </div>
-      </div>
+      <PreviewView
+        selectedModpack={selectedModpack}
+        selectedVersion={selectedVersion}
+        loading={loading}
+        onClose={onClose}
+        onBack={() => {
+          setSelectedModpack(null);
+          setSelectedVersion(null);
+          setStep('search');
+        }}
+        onInstall={handleInstall}
+      />
     );
   }
 
@@ -481,149 +342,19 @@ export default function ModpackDownloadModal({ onClose }) {
 
   if (step === 'search' || step === 'loading' || step === 'selecting') {
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div
-          className="modal-content modpack-download-modal"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="modal-header">
-            <h2>⬇️ Descargar modpack desde CurseForge</h2>
-            <button className="modal-close" onClick={onClose}>
-              ✕
-            </button>
-          </div>
-
-          <div className="modal-body">
-            {!isCurseForgeConfigured() && (
-              <div
-                style={{
-                  backgroundColor: 'var(--bg-warning)',
-                  border: '1px solid var(--text-warning)',
-                  padding: 12,
-                  borderRadius: 4,
-                  marginBottom: 16,
-                  fontSize: 12,
-                  color: 'var(--text-warning)',
-                }}
-              >
-                ⚠️ CurseForge API no está configurada. Necesitas una API key gratuita en .env
-              </div>
-            )}
-
-            <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>
-              <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                  Buscar modpack
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Ej: Create, All The Mods..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  disabled={loading}
-                  style={{ marginBottom: 8 }}
-                />
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                  Versión Minecraft (opcional)
-                </label>
-                <select
-                  className="input"
-                  value={gameVersion}
-                  onChange={(e) => setGameVersion(e.target.value)}
-                  disabled={loading}
-                >
-                  <option value="">Cualquier versión</option>
-                  <option value="1.21">1.21</option>
-                  <option value="1.20.1">1.20.1</option>
-                  <option value="1.20">1.20</option>
-                  <option value="1.19.2">1.19.2</option>
-                  <option value="1.18">1.18</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={!searchQuery.trim() || loading}
-                style={{ width: '100%' }}
-              >
-                {loading ? '🔄 Buscando...' : '🔍 Buscar'}
-              </button>
-            </form>
-
-            {modpacks.length > 0 && (
-              <div className="modpack-list">
-                {modpacks.map((modpack) => (
-                  <button
-                    key={modpack.id}
-                    className="modpack-card"
-                    onClick={() => handleSelectModpack(modpack)}
-                    disabled={loading}
-                  >
-                    {modpack.logo && (
-                      <img
-                        src={modpack.logo.url}
-                        alt={modpack.name}
-                        className="modpack-card-logo"
-                      />
-                    )}
-                    <div className="modpack-card-content">
-                      <div className="modpack-card-name">{modpack.name}</div>
-                      <div className="modpack-card-summary">{modpack.summary}</div>
-                      <div className="modpack-card-meta">
-                        ⬇️ {formatNumber(modpack.downloadCount || 0)}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {modpacks.length === 0 && !loading && searchQuery && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0' }}>
-                <p>No se encontraron resultados</p>
-                <p style={{ fontSize: 12, marginTop: 8 }}>
-                  Intenta con otro término de búsqueda
-                </p>
-              </div>
-            )}
-
-            {loading && (
-              <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <p>🔄 Buscando modpacks...</p>
-              </div>
-            )}
-          </div>
-
-          <div className="modal-footer">
-            <button className="btn btn-ghost" onClick={onClose}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      </div>
+      <SearchView
+        onClose={onClose}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        gameVersion={gameVersion}
+        setGameVersion={setGameVersion}
+        loading={loading}
+        modpacks={modpacks}
+        handleSearch={handleSearch}
+        handleSelectModpack={handleSelectModpack}
+      />
     );
   }
 
   return null;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────
-
-function formatFileSize(bytes) {
-  if (!bytes) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 10) / 10 + ' ' + sizes[i];
-}
-
-function formatNumber(num) {
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-  return num.toString();
 }

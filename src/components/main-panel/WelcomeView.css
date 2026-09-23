@@ -1,0 +1,39 @@
+/* WelcomeView.css */
+/* ---- Empty / Welcome view ---- */
+.welcome-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--gap-lg);
+  text-align: center;
+  padding: var(--gap-xl);
+}
+
+.welcome-logo {
+  font-size: 72px;
+  animation: pulse 4s ease-in-out infinite;
+}
+
+.welcome-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.welcome-title span { color: var(--accent); }
+
+.welcome-subtitle {
+  color: var(--text-muted);
+  font-size: 15px;
+  max-width: 360px;
+  line-height: 1.7;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: var(--gap-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}

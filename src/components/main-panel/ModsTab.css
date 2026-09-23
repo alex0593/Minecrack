@@ -1,0 +1,249 @@
+/* ModsTab.css */
+
+/* Descripción expandida de un mod */
+.mod-description-panel {
+  padding: 8px 12px;
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+  line-height: 1.5;
+}
+
+.mod-description-empty { color: var(--text-muted); font-style: italic; }
+
+.mod-expanded-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Mods tab — grid view */
+.mods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--gap-md);
+}
+
+.mod-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--gap-md);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap-md);
+  transition: all var(--transition);
+}
+
+.mod-card:hover {
+  border-color: rgba(255,255,255,0.12);
+  transform: translateY(-1px);
+}
+
+.mod-card.disabled { opacity: 0.5; }
+
+.mod-icon-box {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.mod-info { flex: 1; min-width: 0; }
+.mod-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.mod-actions { display: flex; gap: 6px; margin-top: 8px; }
+
+/* Icono de mod como imagen */
+.mod-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  display: block;
+  image-rendering: pixelated; /* Para iconos de Minecraft estilo pixel-art */
+}
+
+/* Icono tiny en modo compacto */
+.mod-compact-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 3px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+/* Barra de búsqueda de mods */
+.mods-search-bar {
+  position: relative;
+  margin: 8px 0 6px;
+}
+
+.mods-search-input {
+  width: 100%;
+  padding: 7px 36px 7px 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.mods-search-input:focus {
+  border-color: var(--accent);
+}
+
+.mods-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.mods-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.mods-search-clear:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+/* ─── Mod view mode toggle ───────────────────────────────── */
+.mods-view-toggle {
+  display: flex;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.mods-view-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: var(--font-sans);
+}
+
+.mods-view-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.mods-view-btn.active { color: var(--accent); background: var(--accent-glow); }
+
+/* ─── Compact view ───────────────────────────────────────── */
+.mods-compact {
+  display: flex;
+  flex-direction: column;
+}
+
+.mod-row-compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  transition: background var(--transition);
+}
+
+.mod-row-compact:hover { background: var(--bg-surface); }
+.mod-row-compact.disabled { opacity: 0.45; }
+
+.mod-compact-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.mod-compact-dot.off { background: var(--text-muted); }
+
+.mod-compact-name { flex: 1; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mod-compact-actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity var(--transition); }
+.mod-row-compact:hover .mod-compact-actions { opacity: 1; }
+
+/* ─── Export notification ───────────────────────────────────── */
+.export-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  max-width: 350px;
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  animation: slideInUp 0.3s ease;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.export-notification-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-notification-icon {
+  font-size: 20px;
+  color: var(--accent);
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.export-notification-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-notification-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.export-notification-details {
+  font-size: 12px;
+  color: var(--text-muted);
+}

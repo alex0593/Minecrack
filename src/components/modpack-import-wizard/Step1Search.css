@@ -1,0 +1,175 @@
+/* Step1Search.css - Estilos del Paso 1: busqueda de modpacks */
+
+/* ─── Step 1: Search ───────────────────────────────────────────────────────── */
+.wizard-step-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+  height: 100%;
+}
+
+.wizard-search-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-lg);
+  background: var(--bg-surface);
+  padding: var(--gap-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.wizard-search-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+}
+
+.wizard-search-subtitle {
+  margin: var(--gap-xs) 0 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.wizard-version-select-header {
+  min-width: 140px;
+}
+
+.wizard-tabs {
+  display: flex;
+  gap: var(--gap-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.wizard-tab {
+  padding: var(--gap-md) var(--gap-lg);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.wizard-tab:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.wizard-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.wizard-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wizard-search-section {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: var(--gap-md);
+}
+
+.wizard-search-row {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+}
+
+.wizard-search-input {
+  flex: 1;
+  padding: var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.wizard-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.1);
+}
+
+.wizard-version-select {
+  padding: var(--gap-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.wizard-version-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.wizard-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--gap-lg);
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap-lg) 0;
+  align-content: start;
+}
+
+.wizard-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.wizard-no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-md);
+  padding: var(--gap-xl) var(--gap-lg);
+  color: var(--text-secondary);
+  min-height: 300px;
+}
+
+.wizard-no-results-icon {
+  font-size: 64px;
+  opacity: 0.3;
+}
+
+.wizard-no-results p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.wizard-load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: var(--gap-lg) 0;
+}
+
+@media (max-width: 1200px) {
+  .wizard-search-section {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-version-select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .wizard-search-section {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-results-grid {
+    grid-template-columns: 1fr;
+  }
+}

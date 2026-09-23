@@ -5,12 +5,11 @@ import { searchMods as searchModsCF, searchModpacks as searchModpacksCF, isCurse
 import { importInstanceFromZip, getModsToDownload } from '../lib/tauri';
 import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
 import { LOADERS } from '../lib/instances';
-import Select from './ui/Select';
-import ModCard from './mod-browser-modal/ModCard';
 import ModDetail from './mod-browser-modal/ModDetail';
+import FilterBar from './mod-browser-modal/FilterBar';
+import ModResultsList from './mod-browser-modal/ModResultsList';
+import VanillaGuard from './mod-browser-modal/VanillaGuard';
 import './ModBrowserModal.css';
-
-const LOADERS_MODRINTH = ['fabric', 'forge', 'quilt', 'neoforge'];
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
 export default function ModBrowserModal({ instanceId, onClose }) {
@@ -22,34 +21,9 @@ export default function ModBrowserModal({ instanceId, onClose }) {
   // antes, montar el guard con 1 hook y pasar al explorador con 13+ lanzaba
   // "Rendered more/fewer hooks than expected".
   if (instance?.loader === 'vanilla') {
-    return <ModBrowserVanillaGuard onClose={onClose} />;
+    return <VanillaGuard onClose={onClose} />;
   }
   return <ModBrowserContent instanceId={instanceId} onClose={onClose} />;
-}
-
-/** ModBrowserVanillaGuard — aviso «Vanilla no soporta mods» con cierre */
-function ModBrowserVanillaGuard({ onClose }) {
-  return (
-    <div className="modbrowser-overlay" onClick={onClose}>
-      <div className="modbrowser-modal modal modal--sm" onClick={e => e.stopPropagation()} style={{ minHeight: 'auto' }}>
-        <div className="modbrowser-header">
-          <h2>📦 Explorar Mods</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div style={{ textAlign: 'center', padding: '48px 32px' }}>
-          <div style={{ fontSize: 52, marginBottom: 16 }}>🚫</div>
-          <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Vanilla no soporta mods</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-            Para instalar mods necesitas cambiar el loader de la instancia a
-            <strong> Fabric</strong>, <strong>Forge</strong>, <strong>Quilt</strong> o <strong>NeoForge</strong>.
-          </p>
-        </div>
-        <div className="modal-footer" style={{ justifyContent: 'center' }}>
-          <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ─── Explorador completo (montar solo con loader que soporte mods) ───────────
@@ -166,93 +140,33 @@ function ModBrowserContent({ instanceId, onClose }) {
         </div>
 
         {/* Filtros */}
-        <div className="modbrowser-filters">
-          <input
-            className="modbrowser-search"
-            placeholder={filterType === 'mods' ? 'Buscar mods...' : 'Buscar modpacks...'}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            autoFocus
-          />
-          <Select
-            size="sm"
-            value={filterType}
-            onChange={setFilterType}
-            options={[
-              { value: 'mods', label: 'Mods' },
-              { value: 'modpacks', label: 'Modpacks' },
-            ]}
-          />
-          <Select
-            size="sm"
-            value={filterSource}
-            onChange={setFilterSource}
-            options={[
-              { value: 'modrinth', label: 'Modrinth' },
-              ...(isCurseForgeConfigured() ? [{ value: 'curseforge', label: 'CurseForge' }] : []),
-            ]}
-          />
-          <input
-            className="modbrowser-filter-input"
-            placeholder="Versión MC"
-            value={filterVersion}
-            onChange={e => setFilterVersion(e.target.value)}
-          />
-          <Select
-            size="sm"
-            value={filterLoader}
-            onChange={setFilterLoader}
-            placeholder="Todos los loaders"
-            options={[
-              { value: '', label: 'Todos los loaders' },
-              ...LOADERS_MODRINTH.map(l => ({
-                value: l,
-                label: l.charAt(0).toUpperCase() + l.slice(1),
-              })),
-            ]}
-          />
-        </div>
+        <FilterBar
+          query={query}
+          onQueryChange={setQuery}
+          filterType={filterType}
+          onFilterTypeChange={setFilterType}
+          filterSource={filterSource}
+          onFilterSourceChange={setFilterSource}
+          filterVersion={filterVersion}
+          onFilterVersionChange={setFilterVersion}
+          filterLoader={filterLoader}
+          onFilterLoaderChange={setFilterLoader}
+        />
 
         {/* Cuerpo */}
         <div className="modbrowser-body">
 
           {/* Lista */}
-          <div className="modbrowser-list">
-            {loading && results.length === 0 ? (
-              <div className="modbrowser-loading">Buscando...</div>
-            ) : error ? (
-              <div className="modbrowser-loading" style={{ color: 'var(--red)', textAlign: 'center', padding: '24px 16px', lineHeight: 1.5 }}>
-                ⚠️ {error}
-              </div>
-            ) : results.length === 0 ? (
-              <div className="modbrowser-loading">No se encontraron mods</div>
-            ) : (
-              <>
-                <div className="modbrowser-count">
-                  {total.toLocaleString()} resultados
-                </div>
-                {results.map(mod => (
-                  <ModCard
-                    key={mod.project_id}
-                    mod={mod}
-                    selected={selected?.project_id === mod.project_id}
-                    onClick={() => setSelected(mod)}
-                    isInstalled={installedIds.some(id => id === mod.project_id || id === mod.slug)}
-                  />
-                ))}
-                {results.length < total && (
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    style={{ width: '100%', marginTop: 8 }}
-                    onClick={loadMore}
-                    disabled={loading}
-                  >
-                    {loading ? 'Cargando...' : 'Cargar más'}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
+          <ModResultsList
+            loading={loading}
+            error={error}
+            results={results}
+            total={total}
+            selected={selected}
+            onSelect={setSelected}
+            installedIds={installedIds}
+            onLoadMore={loadMore}
+          />
 
           {/* Detalle */}
           <div className="modbrowser-detail-panel">

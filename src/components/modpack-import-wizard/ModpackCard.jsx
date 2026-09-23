@@ -1,5 +1,7 @@
 /** ModpackCard — Tarjeta de un modpack en la cuadrícula de resultados */
 
+import './ModpackCard.css';
+
 export default function ModpackCard({ source, pack, onClick, isSelected }) {
   const display = source === 'curseforge'
     ? {

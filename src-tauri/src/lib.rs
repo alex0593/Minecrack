@@ -1,14 +1,17 @@
-use std::path::PathBuf;
-use std::io::{Write, Read};
-use serde::{Deserialize, Serialize};
-use sha1::{Sha1, Digest};
-use futures_util::StreamExt;
-use tauri::Emitter;
-use flate2::read::GzDecoder;
-use tar::Archive as TarArchive;
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use sha1::{Digest, Sha1};
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use tauri::Emitter;
 
+mod archives;
+mod authority;
+mod network;
+mod processes;
+mod safe_fs;
 mod sync;
+mod transfers;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Estructuras compartidas JS ↔ Rust
@@ -16,18 +19,18 @@ mod sync;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DownloadProgress {
-    pub file:     String,
+    pub file: String,
     pub received: u64,
-    pub total:    u64,
-    pub percent:  f64,
+    pub total: u64,
+    pub percent: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadTask {
-    pub url:      String,
-    pub dest:     String,   // ruta absoluta destino
-    pub sha1:     Option<String>,
-    pub label:    String,
+    pub url: String,
+    pub dest: String, // ruta absoluta destino
+    pub sha1: Option<String>,
+    pub label: String,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,12 +39,7 @@ pub struct DownloadTask {
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
 async fn get_launcher_dir() -> Result<String, String> {
-    let base = dirs::data_dir()
-        .ok_or("No se pudo obtener el directorio de datos del usuario")?;
-    let launcher_dir = base.join("minecrack");
-    std::fs::create_dir_all(&launcher_dir)
-        .map_err(|e| e.to_string())?;
-    Ok(launcher_dir.to_string_lossy().to_string())
+    Ok(safe_fs::root()?.to_string_lossy().to_string())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,7 +59,8 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
     if let Some(parent) = p.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    std::fs::write(&p, content.as_bytes()).map_err(|e| e.to_string())
+    let _lock = safe_fs::lock(&p).await;
+    safe_fs::atomic_write(&p, content.as_bytes())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +68,11 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
 async fn read_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+    String::from_utf8(safe_fs::bounded_read(
+        std::path::Path::new(&path),
+        safe_fs::MAX_JSON,
+    )?)
+    .map_err(|e| e.to_string())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +81,9 @@ async fn read_file(path: String) -> Result<String, String> {
 #[tauri::command]
 async fn delete_file(path: String) -> Result<(), String> {
     let p = PathBuf::from(&path);
-    if !p.exists() { return Ok(()); }
+    if !p.exists() {
+        return Ok(());
+    }
     std::fs::remove_file(&p).map_err(|e| e.to_string())
 }
 
@@ -87,14 +92,19 @@ async fn delete_file(path: String) -> Result<(), String> {
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
 async fn write_file_base64(path: String, content_base64: String) -> Result<(), String> {
-    use base64::{Engine as _, engine::general_purpose};
-    let bytes = general_purpose::STANDARD.decode(&content_base64)
+    use base64::{engine::general_purpose, Engine as _};
+    let bytes = general_purpose::STANDARD
+        .decode(&content_base64)
         .map_err(|e| format!("Base64 inválido: {}", e))?;
     let p = PathBuf::from(&path);
     if let Some(parent) = p.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    std::fs::write(&p, &bytes).map_err(|e| e.to_string())
+    if bytes.len() > 16 * 1024 * 1024 {
+        return Err("Imagen demasiado grande".into());
+    }
+    let _lock = safe_fs::lock(&p).await;
+    safe_fs::atomic_write(&p, &bytes)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -106,7 +116,9 @@ async fn copy_file(src: String, dest: String) -> Result<(), String> {
     if let Some(parent) = dest_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    std::fs::copy(&src, &dest_path).map(|_| ()).map_err(|e| e.to_string())
+    std::fs::copy(&src, &dest_path)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,27 +127,17 @@ async fn copy_file(src: String, dest: String) -> Result<(), String> {
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
 async fn file_exists(path: String, expected_sha1: Option<String>) -> bool {
-    let p = PathBuf::from(&path);
-    if !p.exists() { return false; }
-    if let Some(expected) = expected_sha1 {
-        // Clone path for the blocking task
-        let path_clone = p.clone();
-        let expected_lower = expected.to_lowercase();
-
-        // Wrap SHA1 computation in spawn_blocking to avoid blocking async runtime
-        let result = tokio::task::spawn_blocking(move || {
-            match std::fs::read(&path_clone) {
-                Ok(data) => {
-                    let hash = format!("{:x}", Sha1::digest(&data));
-                    hash == expected_lower
-                }
-                Err(_) => false,
-            }
-        }).await;
-
-        return result.unwrap_or(false);
-    }
-    true
+    let path = PathBuf::from(path);
+    tokio::task::spawn_blocking(move || {
+        if safe_fs::no_links(&path).is_err() || !path.is_file() {
+            return false;
+        }
+        expected_sha1
+            .map(|expected| check_file_sha1(&path, &expected))
+            .unwrap_or(true)
+    })
+    .await
+    .unwrap_or(false)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,141 +147,21 @@ async fn file_exists(path: String, expected_sha1: Option<String>) -> bool {
 #[tauri::command]
 async fn download_file(
     window: tauri::Window,
-    url:    String,
-    dest:   String,
-    sha1:   Option<String>,
-    label:  String,
+    url: String,
+    dest: String,
+    sha1: Option<String>,
+    label: String,
 ) -> Result<(), String> {
-    let dest_path = PathBuf::from(&dest);
-
-    // Si ya existe y el hash coincide, skip
-    if dest_path.exists() {
-        if let Some(ref expected) = sha1 {
-            let data = std::fs::read(&dest_path).map_err(|e| e.to_string())?;
-            let hash = format!("{:x}", Sha1::digest(&data));
-            if &hash == expected {
-                let _ = window.emit("download://progress", DownloadProgress {
-                    file: label.clone(), received: 1, total: 1, percent: 100.0,
-                });
-                return Ok(());
-            }
-        }
-    }
-
-    // Crear directorio padre
-    if let Some(parent) = dest_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-
-    // HTTP GET con stream.
-    // Deshabilitamos la descompresión automática de gzip para evitar errores de decodificación
-    // al descargar archivos binarios grandes (JARs, ZIPs) que el servidor podría comprimir.
-    let client = reqwest::Client::builder()
-        .no_gzip()              // Evitar double-decompression en JARs que ya son ZIPs
-        .no_brotli()
-        .no_deflate()
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    let mut last_error = String::new();
-
-    for attempt in 1..=5 {
-        let res = client.get(&url)
-            .header("User-Agent", "Minecrack/1.0")
-            .header("Accept-Encoding", "identity") // Pedir al servidor que no comprima
-            .timeout(std::time::Duration::from_secs(300)) // 5 min para archivos grandes
-            .send()
-            .await;
-
-        match res {
-            Ok(response) => {
-                if !response.status().is_success() {
-                    last_error = format!("HTTP {}", response.status());
-                    if attempt < 5 {
-                        let delay = (attempt as u64) * 3; // 3s, 6s, 9s, 12s
-                        tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-                    }
-                    continue;
-                }
-
-                let total = response.content_length().unwrap_or(0);
-                let mut received: u64 = 0;
-                let mut stream = response.bytes_stream();
-                let mut hasher = Sha1::new();  // Crear nuevo hasher para cada intento
-
-                match std::fs::File::create(&dest_path) {
-                    Ok(mut file) => {
-                        let mut stream_error = false;
-                        while let Some(chunk_result) = stream.next().await {
-                            match chunk_result {
-                                Ok(data) => {
-                                    if let Err(e) = file.write_all(&data) {
-                                        last_error = format!("Error escribiendo archivo: {}", e);
-                                        stream_error = true;
-                                        break;
-                                    }
-                                    hasher.update(&data);
-                                    received += data.len() as u64;
-
-                                    let percent = if total > 0 {
-                                        (received as f64 / total as f64) * 100.0
-                                    } else { 0.0 };
-
-                                    let _ = window.emit("download://progress", DownloadProgress {
-                                        file: label.clone(), received, total, percent,
-                                    });
-                                }
-                                Err(e) => {
-                                    last_error = format!("Error en stream: {}", e);
-                                    stream_error = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if !stream_error {
-                            // Descarga completada, verificar hash si es requerido
-                            if let Some(expected) = &sha1 {
-                                let final_hash = format!("{:x}", hasher.finalize());
-                                if final_hash != expected.to_lowercase() {
-                                    last_error = format!("SHA1 mismatch: esperado {}, obtenido {}", expected, final_hash);
-                                    std::fs::remove_file(&dest_path).ok();
-                                    if attempt < 5 {
-                                        let delay = (attempt as u64) * 3; // 3s, 6s, 9s, 12s
-                                        tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-                                    }
-                                    continue;  // Reintentar
-                                }
-                            }
-
-                            // Descarga y hash válidos, salir
-                            let _ = window.emit("download://done", &label);
-                            return Ok(());
-                        }
-                    }
-                    Err(e) => {
-                        last_error = format!("Error creando archivo: {}", e);
-                        if attempt < 5 {
-                            let delay = (attempt as u64) * 3; // 3s, 6s, 9s, 12s
-                            tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-                        }
-                        continue;
-                    }
-                }
-            }
-            Err(e) => {
-                last_error = format!("Error en HTTP: {}", e);
-                if attempt < 5 {
-                    let delay = (attempt as u64) * 3; // 3s, 6s, 9s, 12s
-                    tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-                }
-            }
-        }
-    }
-
-    // Si llegó aquí, todos los intentos fallaron
-    std::fs::remove_file(&dest_path).ok();
-    Err(format!("Error descargando {} (5 intentos fallados): {}", label, last_error))
+    transfers::download(
+        &window,
+        &url,
+        &PathBuf::from(dest),
+        sha1.as_deref(),
+        None,
+        None,
+        &label,
+    )
+    .await
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -287,12 +169,12 @@ async fn download_file(
 // ─────────────────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchConfig {
-    pub java_path:   String,
-    pub jvm_args:    Vec<String>,
-    pub classpath:   String,
-    pub main_class:  String,
-    pub game_args:   Vec<String>,
-    pub game_dir:    String,
+    pub java_path: String,
+    pub jvm_args: Vec<String>,
+    pub classpath: String,
+    pub main_class: String,
+    pub game_args: Vec<String>,
+    pub game_dir: String,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -304,7 +186,7 @@ pub struct GameInstance {
     pub id: String,
     pub name: String,
     pub version: String,
-    pub loader: String,  // "vanilla", "fabric", "forge", "quilt", "neoforge"
+    pub loader: String, // "vanilla", "fabric", "forge", "quilt", "neoforge"
     #[serde(default)]
     pub loader_version: Option<String>,
     #[serde(default)]
@@ -338,16 +220,15 @@ pub struct GameVersionData {
 }
 
 #[tauri::command]
-async fn launch_game(
-    window: tauri::Window,
-    config: LaunchConfig,
-) -> Result<(), String> {
+async fn launch_game(window: tauri::Window, config: LaunchConfig) -> Result<(), String> {
     use std::process::Stdio;
 
     // ✓ PASO CRÍTICO: Convertir rutas de forward slashes a backslashes para Windows
     // JavaScript envía rutas con forward slashes (C:/path/to/file.jar o C:\path/to/file.jar)
     // Pero Java en Windows necesita backslashes consistentes para acceder a archivos físicos
-    let jvm_args_fixed: Vec<String> = config.jvm_args.iter()
+    let jvm_args_fixed: Vec<String> = config
+        .jvm_args
+        .iter()
         .map(|arg| {
             // Si el argumento es un property JVM (-Dkey=value) y contiene una ruta Windows,
             // convertir TODOS los forward slashes a backslashes
@@ -370,14 +251,20 @@ async fn launch_game(
     for (i, arg) in jvm_args_fixed.iter().enumerate() {
         eprintln!("[Rust]   [{}] {}", i, arg);
     }
-    eprintln!("[Rust] Classpath entries: {}", config.classpath.matches(';').count() + 1);
+    eprintln!(
+        "[Rust] Classpath entries: {}",
+        config.classpath.matches(';').count() + 1
+    );
     if config.classpath.len() > 500 {
-        eprintln!("[Rust]   [classpath truncado - {} chars total]", config.classpath.len());
+        eprintln!(
+            "[Rust]   [classpath truncado - {} chars total]",
+            config.classpath.len()
+        );
         // Mostrar primeras y últimas partes del classpath
         let parts: Vec<&str> = config.classpath.split(';').collect();
         if parts.len() > 0 {
             eprintln!("[Rust]   FIRST: {}", parts[0]);
-            eprintln!("[Rust]   LAST: {}", parts[parts.len()-1]);
+            eprintln!("[Rust]   LAST: {}", parts[parts.len() - 1]);
         }
     } else {
         eprintln!("[Rust]   {}", config.classpath);
@@ -400,8 +287,15 @@ async fn launch_game(
                 eprintln!("[Rust] ¿Existe?: {}", if exists { "✓ SÍ" } else { "✗ NO" });
 
                 if let Ok(meta) = metadata {
-                    eprintln!("[Rust] Tamaño: {} bytes (~{} MB)", meta.len(), meta.len() / (1024 * 1024));
-                    eprintln!("[Rust] Es archivo?: {}", if meta.is_file() { "✓ SÍ" } else { "✗ NO" });
+                    eprintln!(
+                        "[Rust] Tamaño: {} bytes (~{} MB)",
+                        meta.len(),
+                        meta.len() / (1024 * 1024)
+                    );
+                    eprintln!(
+                        "[Rust] Es archivo?: {}",
+                        if meta.is_file() { "✓ SÍ" } else { "✗ NO" }
+                    );
                 } else {
                     eprintln!("[Rust] No se pudo leer metadata del archivo");
                 }
@@ -429,7 +323,9 @@ async fn launch_game(
     // ✓ DIAGNÓSTICO 3: Verificar game_args
     eprintln!("[Rust] Game Args ({} total):", config.game_args.len());
     if config.game_args.is_empty() {
-        eprintln!("[Rust] ⚠️ No hay game_args. ForgeWrapper podría no saber qué versión/gameDir usar.");
+        eprintln!(
+            "[Rust] ⚠️ No hay game_args. ForgeWrapper podría no saber qué versión/gameDir usar."
+        );
     } else {
         for (i, arg) in config.game_args.iter().enumerate() {
             eprintln!("[Rust]   [game_args {}] {}", i, arg);
@@ -454,7 +350,10 @@ async fn launch_game(
     }
 
     if !java_path.is_file() {
-        return Err(format!("FATAL: La ruta de Java no es un archivo: {}", config.java_path));
+        return Err(format!(
+            "FATAL: La ruta de Java no es un archivo: {}",
+            config.java_path
+        ));
     }
 
     eprintln!("[Rust] ✓ Java validado: {}", config.java_path);
@@ -470,7 +369,10 @@ async fn launch_game(
     let total_arg_size: usize = config.jvm_args.iter().map(|s| s.len()).sum::<usize>()
         + config.game_args.iter().map(|s| s.len()).sum::<usize>()
         + config.classpath.len();
-    eprintln!("[Rust] Total de caracteres en argumentos: {} bytes", total_arg_size);
+    eprintln!(
+        "[Rust] Total de caracteres en argumentos: {} bytes",
+        total_arg_size
+    );
     if total_arg_size > 32000 {
         eprintln!("[Rust] ⚠️ ADVERTENCIA: Línea de comandos muy larga ({} bytes). Podría causar problemas.", total_arg_size);
     }
@@ -481,10 +383,14 @@ async fn launch_game(
     args.push(config.main_class.clone());
     args.extend(config.game_args.clone());
 
-    eprintln!("[Rust] ✓ Intentando lanzar Java con {} argumentos...", args.len());
+    eprintln!(
+        "[Rust] ✓ Intentando lanzar Java con {} argumentos...",
+        args.len()
+    );
 
     let mut std_cmd = std::process::Command::new(&config.java_path);
-    std_cmd.args(&args)
+    std_cmd
+        .args(&args)
         .current_dir(&config.game_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -511,7 +417,10 @@ async fn launch_game(
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut lines = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let _ = win.emit("game://log", serde_json::json!({ "text": line, "level": "info" }));
+                let _ = win.emit(
+                    "game://log",
+                    serde_json::json!({ "text": line, "level": "info" }),
+                );
             }
         });
     }
@@ -530,7 +439,10 @@ async fn launch_game(
                 } else {
                     "info"
                 };
-                let _ = win.emit("game://log", serde_json::json!({ "text": line, "level": level }));
+                let _ = win.emit(
+                    "game://log",
+                    serde_json::json!({ "text": line, "level": level }),
+                );
             }
         });
     }
@@ -546,10 +458,10 @@ async fn launch_game(
 // ─────────────────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModInfo {
-    pub filename:    String,         // ej: "sodium-0.5.3.jar"
-    pub name:        String,         // ej: "Sodium"
-    pub version:     String,         // ej: "0.5.3"
-    pub enabled:     bool,           // true si es .jar, false si es .jar.disabled
+    pub filename: String,            // ej: "sodium-0.5.3.jar"
+    pub name: String,                // ej: "Sodium"
+    pub version: String,             // ej: "0.5.3"
+    pub enabled: bool,               // true si es .jar, false si es .jar.disabled
     pub description: Option<String>, // descripción del mod leída del JAR
     #[serde(rename = "iconBase64")]
     pub icon_base64: Option<String>, // data URL (data:image/png;base64,...) o None
@@ -561,18 +473,18 @@ pub struct ModInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModsZipManifest {
     pub minecrack_version: String,
-    pub instance_name:     String,
-    pub mc_version:        String,
-    pub loader:            String,
-    pub loader_version:    Option<String>,
-    pub mods:              Vec<ModsZipEntry>,
+    pub instance_name: String,
+    pub mc_version: String,
+    pub loader: String,
+    pub loader_version: Option<String>,
+    pub mods: Vec<ModsZipEntry>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModsZipEntry {
     pub filename: String,
-    pub sha1:     Option<String>,
-    pub enabled:  bool,
+    pub sha1: Option<String>,
+    pub enabled: bool,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -580,7 +492,7 @@ pub struct ModsZipEntry {
 // ─────────────────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExportResult {
-    pub path:      String,
+    pub path: String,
     pub size_bytes: u64,
     pub mod_count: usize,
 }
@@ -588,7 +500,7 @@ pub struct ExportResult {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImportResult {
     pub imported: usize,
-    pub skipped:  usize,
+    pub skipped: usize,
     pub conflicts: usize,
 }
 
@@ -597,7 +509,10 @@ pub struct ImportResult {
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
 async fn list_mods(launcher_dir: String, instance_id: String) -> Result<Vec<ModInfo>, String> {
-    let mods_dir = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("mods");
+    let mods_dir = PathBuf::from(launcher_dir)
+        .join("instances")
+        .join(&instance_id)
+        .join("mods");
 
     if !mods_dir.exists() {
         return Ok(Vec::new());
@@ -617,11 +532,14 @@ async fn list_mods(launcher_dir: String, instance_id: String) -> Result<Vec<ModI
             }
 
             let enabled = filename_str.ends_with(".jar");
-            let (name, version, description, icon_base64) = extract_mod_metadata(&path).unwrap_or_else(|| {
-                // Si no se puede extraer metadata, usar nombre del archivo
-                let clean_name = filename_str.replace(".jar.disabled", "").replace(".jar", "");
-                (clean_name.clone(), "unknown".to_string(), None, None)
-            });
+            let (name, version, description, icon_base64) = extract_mod_metadata(&path)
+                .unwrap_or_else(|| {
+                    // Si no se puede extraer metadata, usar nombre del archivo
+                    let clean_name = filename_str
+                        .replace(".jar.disabled", "")
+                        .replace(".jar", "");
+                    (clean_name.clone(), "unknown".to_string(), None, None)
+                });
 
             mods.push(ModInfo {
                 filename: filename_str,
@@ -670,12 +588,18 @@ fn parse_toml_value(line: &str) -> Option<String> {
 
     // Caso 3: sin comillas → quitar comentario TOML (#...) y espacios
     let no_comment = after_eq.split('#').next().unwrap_or("").trim();
-    if no_comment.is_empty() { None } else { Some(no_comment.to_string()) }
+    if no_comment.is_empty() {
+        None
+    } else {
+        Some(no_comment.to_string())
+    }
 }
 
 // Helper: extrae metadata de un JAR (nombre, versión, descripción e icono como data URL)
-fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<String>, Option<String>)> {
-    use base64::{Engine as _, engine::general_purpose};
+fn extract_mod_metadata(
+    jar_path: &PathBuf,
+) -> Option<(String, String, Option<String>, Option<String>)> {
+    use base64::{engine::general_purpose, Engine as _};
 
     let file = std::fs::File::open(jar_path).ok()?;
     let mut archive = zip::ZipArchive::new(file).ok()?;
@@ -686,7 +610,13 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<St
             match archive.by_name($name) {
                 Ok(mut f) => {
                     let mut s = String::new();
-                    if f.read_to_string(&mut s).is_ok() { Some(s) } else { None }
+                    if f.take(safe_fs::MAX_JSON + 1).read_to_string(&mut s).is_ok()
+                        && s.len() as u64 <= safe_fs::MAX_JSON
+                    {
+                        Some(s)
+                    } else {
+                        None
+                    }
                 }
                 Err(_) => None,
             }
@@ -699,7 +629,10 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<St
             match archive.by_name($name) {
                 Ok(mut f) => {
                     let mut buf = Vec::new();
-                    if std::io::Read::read_to_end(&mut f, &mut buf).is_ok() && !buf.is_empty() {
+                    if f.take(2 * 1024 * 1024 + 1).read_to_end(&mut buf).is_ok()
+                        && !buf.is_empty()
+                        && buf.len() <= 2 * 1024 * 1024
+                    {
                         Some(buf)
                     } else {
                         None
@@ -712,10 +645,18 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<St
 
     // Convierte bytes a data URL, infiriendo mime por extensión
     let to_data_url = |bytes: Vec<u8>, path: &str| -> String {
-        let mime = if path.ends_with(".jpg") || path.ends_with(".jpeg") { "image/jpeg" }
-                   else if path.ends_with(".gif") { "image/gif" }
-                   else { "image/png" };
-        format!("data:{};base64,{}", mime, general_purpose::STANDARD.encode(&bytes))
+        let mime = if path.ends_with(".jpg") || path.ends_with(".jpeg") {
+            "image/jpeg"
+        } else if path.ends_with(".gif") {
+            "image/gif"
+        } else {
+            "image/png"
+        };
+        format!(
+            "data:{};base64,{}",
+            mime,
+            general_purpose::STANDARD.encode(&bytes)
+        )
     };
 
     // ─── Fabric ───────────────────────────────────────────────────────────────
@@ -726,9 +667,9 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<St
             let version = sanitize_version(json["version"].as_str().unwrap_or(""));
             let description = json["description"].as_str().map(|s| s.to_string());
             let icon_path: Option<String> = json["icon"].as_str().map(|s| s.to_string());
-            let icon_base64 = icon_path.as_deref().and_then(|path| {
-                read_zip_bytes!(path).map(|b| to_data_url(b, path))
-            });
+            let icon_base64 = icon_path
+                .as_deref()
+                .and_then(|path| read_zip_bytes!(path).map(|b| to_data_url(b, path)));
             return Some((name, version, description, icon_base64));
         }
     }
@@ -736,26 +677,30 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<St
     // ─── Forge / NeoForge ─────────────────────────────────────────────────────
     let forge_content = read_zip_str!("META-INF/mods.toml");
     if let Some(content) = forge_content {
-        let name = content.lines()
+        let name = content
+            .lines()
             .find(|l| l.trim().starts_with("displayName"))
             .and_then(parse_toml_value)
             .unwrap_or_else(|| "Unknown".to_string());
         let version = sanitize_version(
-            &content.lines()
+            &content
+                .lines()
                 .find(|l| l.trim().starts_with("version") && !l.trim().starts_with("versionRange"))
                 .and_then(parse_toml_value)
-                .unwrap_or_default()
+                .unwrap_or_default(),
         );
-        let description = content.lines()
+        let description = content
+            .lines()
             .find(|l| l.trim().starts_with("description"))
             .and_then(parse_toml_value)
             .filter(|s| !s.is_empty() && !s.contains("${"));
-        let logo_path: Option<String> = content.lines()
+        let logo_path: Option<String> = content
+            .lines()
             .find(|l| l.trim().starts_with("logoFile"))
             .and_then(parse_toml_value);
-        let icon_base64 = logo_path.as_deref().and_then(|path| {
-            read_zip_bytes!(path).map(|b| to_data_url(b, path))
-        });
+        let icon_base64 = logo_path
+            .as_deref()
+            .and_then(|path| read_zip_bytes!(path).map(|b| to_data_url(b, path)));
         return Some((name, version, description, icon_base64));
     }
 
@@ -768,9 +713,9 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<St
             let version = sanitize_version(json["quilt_loader"]["version"].as_str().unwrap_or(""));
             let description = meta["description"].as_str().map(|s| s.to_string());
             let icon_path: Option<String> = meta["icon"].as_str().map(|s| s.to_string());
-            let icon_base64 = icon_path.as_deref().and_then(|path| {
-                read_zip_bytes!(path).map(|b| to_data_url(b, path))
-            });
+            let icon_base64 = icon_path
+                .as_deref()
+                .and_then(|path| read_zip_bytes!(path).map(|b| to_data_url(b, path)));
             return Some((name, version, description, icon_base64));
         }
     }
@@ -782,22 +727,30 @@ fn extract_mod_metadata(jar_path: &PathBuf) -> Option<(String, String, Option<St
 // COMANDO: Elimina un mod
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
-async fn delete_mod(launcher_dir: String, instance_id: String, filename: String) -> Result<(), String> {
+async fn delete_mod(
+    launcher_dir: String,
+    instance_id: String,
+    filename: String,
+) -> Result<(), String> {
     let mod_path = PathBuf::from(launcher_dir)
         .join("instances")
         .join(&instance_id)
         .join("mods")
         .join(&filename);
 
-    std::fs::remove_file(&mod_path)
-        .map_err(|e| format!("No se pudo eliminar el mod: {}", e))
+    std::fs::remove_file(&mod_path).map_err(|e| format!("No se pudo eliminar el mod: {}", e))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMANDO: Activa/desactiva un mod (renombra entre .jar y .jar.disabled)
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
-async fn toggle_mod(launcher_dir: String, instance_id: String, filename: String, enabled: bool) -> Result<(), String> {
+async fn toggle_mod(
+    launcher_dir: String,
+    instance_id: String,
+    filename: String,
+    enabled: bool,
+) -> Result<(), String> {
     let base_path = PathBuf::from(launcher_dir)
         .join("instances")
         .join(&instance_id)
@@ -853,15 +806,18 @@ async fn export_instance_mods(
     let manifest = ModsZipManifest {
         minecrack_version: "0.1.0".to_string(),
         instance_name: instance["name"].as_str().unwrap_or("Unnamed").to_string(),
-        mc_version: instance["version"].as_str().unwrap_or("unknown").to_string(),
+        mc_version: instance["version"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string(),
         loader: instance["loader"].as_str().unwrap_or("vanilla").to_string(),
         loader_version: instance["loaderVersion"].as_str().map(|s| s.to_string()),
         mods: Vec::new(), // Se completará al crear el ZIP
     };
 
     // Crear el ZIP
-    let file = std::fs::File::create(&dest_zip)
-        .map_err(|e| format!("No se pudo crear el ZIP: {}", e))?;
+    let file =
+        std::fs::File::create(&dest_zip).map_err(|e| format!("No se pudo crear el ZIP: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
 
     // Escribir el manifest
@@ -903,9 +859,7 @@ async fn export_instance_mods(
         .map_err(|e| format!("Error finalizando ZIP: {}", e))?;
 
     // Obtener tamaño del archivo
-    let size_bytes = std::fs::metadata(&dest_zip)
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let size_bytes = std::fs::metadata(&dest_zip).map(|m| m.len()).unwrap_or(0);
 
     Ok(ExportResult {
         path: dest_zip,
@@ -919,10 +873,10 @@ async fn export_instance_mods(
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
 async fn inspect_mods_zip(src_zip: String) -> Result<ModsZipManifest, String> {
-    let file = std::fs::File::open(&src_zip)
-        .map_err(|e| format!("No se pudo abrir el ZIP: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| format!("No es un ZIP válido: {}", e))?;
+    let file =
+        std::fs::File::open(&src_zip).map_err(|e| format!("No se pudo abrir el ZIP: {}", e))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("No es un ZIP válido: {}", e))?;
 
     // Leer el manifest.json — dropeamos el borrow mutable antes de llamar file_names()
     let manifest_content = {
@@ -930,7 +884,8 @@ async fn inspect_mods_zip(src_zip: String) -> Result<ModsZipManifest, String> {
             .by_name("manifest.json")
             .map_err(|_| "El ZIP no contiene manifest.json".to_string())?;
         let mut content = String::new();
-        manifest_file.read_to_string(&mut content)
+        manifest_file
+            .read_to_string(&mut content)
             .map_err(|e| format!("Error leyendo manifest.json: {}", e))?;
         content
     };
@@ -983,10 +938,10 @@ async fn import_instance_mods(
         }
     }
 
-    let file = std::fs::File::open(&src_zip)
-        .map_err(|e| format!("No se pudo abrir el ZIP: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| format!("No es un ZIP válido: {}", e))?;
+    let file =
+        std::fs::File::open(&src_zip).map_err(|e| format!("No se pudo abrir el ZIP: {}", e))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("No es un ZIP válido: {}", e))?;
 
     let mut imported = 0;
     let mut skipped = 0;
@@ -1072,9 +1027,13 @@ fn build_game_arguments(
 
     // Intentar usar formato moderno (arguments field)
     if let Some(arguments_obj) = &version_data.arguments {
-        if let Ok(args_map) = serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(arguments_obj.clone()) {
+        if let Ok(args_map) = serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(
+            arguments_obj.clone(),
+        ) {
             if let Some(game_args_val) = args_map.get("game") {
-                if let Ok(game_args_array) = serde_json::from_value::<Vec<serde_json::Value>>(game_args_val.clone()) {
+                if let Ok(game_args_array) =
+                    serde_json::from_value::<Vec<serde_json::Value>>(game_args_val.clone())
+                {
                     for arg_val in game_args_array {
                         if let Some(arg_str) = arg_val.as_str() {
                             // Reemplazar variables
@@ -1083,14 +1042,20 @@ fn build_game_arguments(
                                 .replace("${version_name}", game_version)
                                 .replace("${game_directory}", game_dir)
                                 .replace("${assets_root}", assets_dir)
-                                .replace("${assets_index_name}", version_data.assets_index_name.as_deref().unwrap_or(game_version))
+                                .replace(
+                                    "${assets_index_name}",
+                                    version_data
+                                        .assets_index_name
+                                        .as_deref()
+                                        .unwrap_or(game_version),
+                                )
                                 .replace("${auth_uuid}", player_uuid)
-                                .replace("${auth_access_token}", "0")  // Offline mode
-                                .replace("${user_properties}", "{}")  // Offline mode
+                                .replace("${auth_access_token}", "0") // Offline mode
+                                .replace("${user_properties}", "{}") // Offline mode
                                 .replace("${user_type}", "offline")
                                 .replace("${version_type}", "release")
-                                .replace("${clientId}", "00000000000000000000000000000000")  // Dummy UUID
-                                .replace("${xuid}", "");  // Empty for offline
+                                .replace("${clientId}", "00000000000000000000000000000000") // Dummy UUID
+                                .replace("${xuid}", ""); // Empty for offline
                             args.push(processed);
                         }
                     }
@@ -1107,7 +1072,13 @@ fn build_game_arguments(
             .replace("${version_name}", game_version)
             .replace("${game_directory}", game_dir)
             .replace("${assets_root}", assets_dir)
-            .replace("${assets_index_name}", version_data.assets_index_name.as_deref().unwrap_or(game_version))
+            .replace(
+                "${assets_index_name}",
+                version_data
+                    .assets_index_name
+                    .as_deref()
+                    .unwrap_or(game_version),
+            )
             .replace("${auth_uuid}", player_uuid)
             .replace("${auth_access_token}", "0")
             .replace("${user_properties}", "{}")
@@ -1117,7 +1088,8 @@ fn build_game_arguments(
             .replace("${xuid}", "");
 
         // Split by whitespace and filter empty
-        args = processed_args.split_whitespace()
+        args = processed_args
+            .split_whitespace()
             .map(|s| s.to_string())
             .collect();
         return Ok(args);
@@ -1153,11 +1125,13 @@ async fn prepare_game_launch(
     profile: GameProfile,
     launcher_dir: String,
     version_data: GameVersionData,
-    java_path: String,  // Ya detectado y validado en JavaScript
+    java_path: String, // Ya detectado y validado en JavaScript
 ) -> Result<LaunchConfig, String> {
     // PASO 0: Validar que recibimos una ruta Java válida
     if java_path.is_empty() || java_path == "java" {
-        return Err("Invalid Java path provided. Use absolute path to java executable.".to_string());
+        return Err(
+            "Invalid Java path provided. Use absolute path to java executable.".to_string(),
+        );
     }
 
     // Usar el Java path que ya fue detectado y validado en JavaScript
@@ -1168,10 +1142,15 @@ async fn prepare_game_launch(
 
     // Agregar librerías del version_data
     for lib in &version_data.libraries {
-        if let Ok(lib_obj) = serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(lib.clone()) {
+        if let Ok(lib_obj) =
+            serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(lib.clone())
+        {
             if let Some(path_val) = lib_obj.get("downloads") {
                 // Extraer path de librería
-                if let Ok(downloads) = serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(path_val.clone()) {
+                if let Ok(downloads) = serde_json::from_value::<
+                    serde_json::Map<String, serde_json::Value>,
+                >(path_val.clone())
+                {
                     if let Some(artifact) = downloads.get("artifact") {
                         if let Some(path_str) = artifact.get("path").and_then(|p| p.as_str()) {
                             let full_path = format!("{}/libraries/{}", launcher_dir, path_str);
@@ -1198,10 +1177,16 @@ async fn prepare_game_launch(
     );
 
     if PathBuf::from(&client_jar_libraries).exists() {
-        eprintln!("[Rust] ✓ Client JAR encontrado (libraries): {}", client_jar_libraries);
+        eprintln!(
+            "[Rust] ✓ Client JAR encontrado (libraries): {}",
+            client_jar_libraries
+        );
         classpath_entries.push(client_jar_libraries);
     } else if PathBuf::from(&client_jar_versions).exists() {
-        eprintln!("[Rust] ✓ Client JAR encontrado (versions): {}", client_jar_versions);
+        eprintln!(
+            "[Rust] ✓ Client JAR encontrado (versions): {}",
+            client_jar_versions
+        );
         classpath_entries.push(client_jar_versions);
     } else {
         eprintln!("[Rust] ⚠️ Client JAR no encontrado en ninguna ruta esperada");
@@ -1223,7 +1208,7 @@ async fn prepare_game_launch(
     if let Some(max_ram) = instance.max_ram {
         jvm_args.push(format!("-Xmx{}M", max_ram));
     } else {
-        jvm_args.push("-Xmx2G".to_string());  // Default 2GB
+        jvm_args.push("-Xmx2G".to_string()); // Default 2GB
     }
 
     // Agregar custom JVM args si existen
@@ -1277,7 +1262,9 @@ fn parse_java_major(version_str: &str) -> u32 {
                         }
                     }
                 }
-                if n >= 8 { return n; }
+                if n >= 8 {
+                    return n;
+                }
             }
         }
     }
@@ -1286,8 +1273,8 @@ fn parse_java_major(version_str: &str) -> u32 {
 
 #[derive(Debug, Serialize)]
 pub struct JavaInstall {
-    pub path:          String,
-    pub version:       String,
+    pub path: String,
+    pub version: String,
     pub major_version: u32,
 }
 
@@ -1326,7 +1313,9 @@ fn detect_java_internal(launcher_dir: Option<String>) -> Vec<JavaInstall> {
     }
 
     for base in candidates {
-        if !base.exists() { continue; }
+        if !base.exists() {
+            continue;
+        }
         if let Ok(entries) = std::fs::read_dir(&base) {
             for entry in entries.flatten() {
                 #[cfg(target_os = "windows")]
@@ -1338,15 +1327,18 @@ fn detect_java_internal(launcher_dir: Option<String>) -> Vec<JavaInstall> {
                     let mut cmd = std::process::Command::new(&java_bin);
                     cmd.arg("-version");
                     #[cfg(target_os = "windows")]
-                    { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+                    {
+                        use std::os::windows::process::CommandExt;
+                        cmd.creation_flags(0x08000000);
+                    }
                     if let Ok(output) = cmd.output() {
                         let ver_str = String::from_utf8_lossy(&output.stderr).to_string()
                             + &String::from_utf8_lossy(&output.stdout);
                         let first_line = ver_str.lines().next().unwrap_or("?").to_string();
                         let major = parse_java_major(&first_line);
                         results.push(JavaInstall {
-                            path:          java_bin.to_string_lossy().to_string(),
-                            version:       first_line,
+                            path: java_bin.to_string_lossy().to_string(),
+                            version: first_line,
                             major_version: major,
                         });
                     }
@@ -1359,16 +1351,22 @@ fn detect_java_internal(launcher_dir: Option<String>) -> Vec<JavaInstall> {
     let mut path_cmd = std::process::Command::new("java");
     path_cmd.arg("-version");
     #[cfg(target_os = "windows")]
-    { use std::os::windows::process::CommandExt; path_cmd.creation_flags(0x08000000); }
+    {
+        use std::os::windows::process::CommandExt;
+        path_cmd.creation_flags(0x08000000);
+    }
     if let Ok(output) = path_cmd.output() {
         let ver_str = String::from_utf8_lossy(&output.stderr).to_string();
         let first_line = ver_str.lines().next().unwrap_or("?").to_string();
         let major = parse_java_major(&first_line);
-        results.insert(0, JavaInstall {
-            path:          "java".to_string(),
-            version:       first_line,
-            major_version: major,
-        });
+        results.insert(
+            0,
+            JavaInstall {
+                path: "java".to_string(),
+                version: first_line,
+                major_version: major,
+            },
+        );
     }
 
     results
@@ -1419,7 +1417,10 @@ async fn download_resourcepack(
         .join(&instance_id)
         .join("resourcepacks");
     std::fs::create_dir_all(&resourcepacks_dir).map_err(|e| e.to_string())?;
-    let dest = resourcepacks_dir.join(&filename).to_string_lossy().to_string();
+    let dest = resourcepacks_dir
+        .join(&filename)
+        .to_string_lossy()
+        .to_string();
     download_file(window, url, dest, sha1, filename).await
 }
 
@@ -1440,7 +1441,10 @@ async fn download_shaderpack(
         .join(&instance_id)
         .join("shaderpacks");
     std::fs::create_dir_all(&shaderpacks_dir).map_err(|e| e.to_string())?;
-    let dest = shaderpacks_dir.join(&filename).to_string_lossy().to_string();
+    let dest = shaderpacks_dir
+        .join(&filename)
+        .to_string_lossy()
+        .to_string();
     download_file(window, url, dest, sha1, filename).await
 }
 
@@ -1449,9 +1453,9 @@ async fn download_shaderpack(
 // ─────────────────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Clone)]
 pub struct JavaInstallProgress {
-    pub phase:   String,
+    pub phase: String,
     pub percent: f64,
-    pub label:   String,
+    pub label: String,
 }
 
 #[tauri::command]
@@ -1462,17 +1466,31 @@ async fn install_java_runtime(
 ) -> Result<String, String> {
     macro_rules! emit {
         ($phase:expr, $pct:expr, $lbl:expr) => {
-            let _ = window.emit("java://progress", JavaInstallProgress {
-                phase: $phase.to_string(), percent: $pct, label: $lbl.to_string(),
-            });
+            let _ = window.emit(
+                "java://progress",
+                JavaInstallProgress {
+                    phase: $phase.to_string(),
+                    percent: $pct,
+                    label: $lbl.to_string(),
+                },
+            );
         };
     }
 
     emit!("fetch", 0.0, "Consultando Adoptium API...");
 
-    let os   = if cfg!(target_os = "windows") { "windows" }
-               else if cfg!(target_os = "macos") { "mac" } else { "linux" };
-    let arch = if cfg!(target_arch = "aarch64") { "aarch64" } else { "x64" };
+    let os = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "mac"
+    } else {
+        "linux"
+    };
+    let arch = if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        "x64"
+    };
 
     let api_url = format!(
         "https://api.adoptium.net/v3/assets/latest/{}/hotspot?architecture={}&image_type=jre&os={}&vendor=eclipse",
@@ -1484,24 +1502,32 @@ async fn install_java_runtime(
         .build()
         .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
 
-    let api_resp = client.get(&api_url)
+    let api_resp = client
+        .get(&api_url)
         .header("User-Agent", "Minecrack/1.0")
-        .send().await
+        .send()
+        .await
         .map_err(|e| format!("Error consultando Adoptium: {}", e))?;
 
     if !api_resp.status().is_success() {
         return Err(format!("Adoptium API devolvió HTTP {}", api_resp.status()));
     }
 
-    let assets: serde_json::Value = api_resp.json().await
+    let assets: serde_json::Value = api_resp
+        .json()
+        .await
         .map_err(|e| format!("Error parseando respuesta de Adoptium: {}", e))?;
 
     let asset = assets.get(0).ok_or("Adoptium no devolvió ningún asset")?;
     let download_url = asset["binary"]["package"]["link"]
-        .as_str().ok_or("No se encontró la URL de descarga")?.to_string();
-    let file_size  = asset["binary"]["package"]["size"].as_u64().unwrap_or(0);
+        .as_str()
+        .ok_or("No se encontró la URL de descarga")?
+        .to_string();
+    let file_size = asset["binary"]["package"]["size"].as_u64().unwrap_or(0);
     let archive_name = asset["binary"]["package"]["name"]
-        .as_str().unwrap_or("jre.archive").to_string();
+        .as_str()
+        .unwrap_or("jre.archive")
+        .to_string();
 
     emit!("fetch", 100.0, "URL obtenida");
 
@@ -1513,14 +1539,19 @@ async fn install_java_runtime(
 
     emit!("download", 0.0, &format!("Descargando {}...", archive_name));
 
-    let mut response = client.get(&download_url)
+    let mut response = client
+        .get(&download_url)
         .header("User-Agent", "Minecrack/1.0")
         .timeout(std::time::Duration::from_secs(600))
-        .send().await
+        .send()
+        .await
         .map_err(|e| format!("Error iniciando descarga: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Error descargando Java: HTTP {}", response.status()));
+        return Err(format!(
+            "Error descargando Java: HTTP {}",
+            response.status()
+        ));
     }
 
     {
@@ -1532,8 +1563,15 @@ async fn install_java_runtime(
             downloaded += chunk.len() as u64;
             if file_size > 0 {
                 let pct = (downloaded as f64 / file_size as f64) * 100.0;
-                emit!("download", pct, &format!("{:.1} MB / {:.1} MB",
-                    downloaded as f64 / 1_048_576.0, file_size as f64 / 1_048_576.0));
+                emit!(
+                    "download",
+                    pct,
+                    &format!(
+                        "{:.1} MB / {:.1} MB",
+                        downloaded as f64 / 1_048_576.0,
+                        file_size as f64 / 1_048_576.0
+                    )
+                );
             }
         }
     }
@@ -1546,45 +1584,58 @@ async fn install_java_runtime(
         .map_err(|e| format!("Error creando directorio de destino: {}", e))?;
 
     if archive_name.ends_with(".zip") {
-        let zip_file = std::fs::File::open(&archive_path)
-            .map_err(|e| format!("Error abriendo ZIP: {}", e))?;
-        let mut zip_archive = zip::ZipArchive::new(zip_file)
-            .map_err(|e| format!("ZIP inválido: {}", e))?;
+        let zip_file =
+            std::fs::File::open(&archive_path).map_err(|e| format!("Error abriendo ZIP: {}", e))?;
+        let mut zip_archive =
+            zip::ZipArchive::new(zip_file).map_err(|e| format!("ZIP inválido: {}", e))?;
         let total = zip_archive.len();
         for i in 0..total {
-            let mut entry = zip_archive.by_index(i)
+            let mut entry = zip_archive
+                .by_index(i)
                 .map_err(|e| format!("Error leyendo ZIP: {}", e))?;
             let name = entry.name().to_string();
             let stripped = name.splitn(2, '/').nth(1).unwrap_or("").to_string();
-            if stripped.is_empty() { continue; }
+            if stripped.is_empty() {
+                continue;
+            }
             let out_path = java_dir.join(&stripped);
             if entry.is_dir() {
                 std::fs::create_dir_all(&out_path).ok();
             } else {
-                if let Some(p) = out_path.parent() { std::fs::create_dir_all(p).ok(); }
+                if let Some(p) = out_path.parent() {
+                    std::fs::create_dir_all(p).ok();
+                }
                 let mut out_file = std::fs::File::create(&out_path)
                     .map_err(|e| format!("Error creando {}: {}", stripped, e))?;
                 std::io::copy(&mut entry, &mut out_file)
                     .map_err(|e| format!("Error extrayendo {}: {}", stripped, e))?;
             }
             if i % 50 == 0 {
-                emit!("extract", (i as f64 / total as f64) * 100.0,
-                    &format!("Extrayendo... {}/{}", i, total));
+                emit!(
+                    "extract",
+                    (i as f64 / total as f64) * 100.0,
+                    &format!("Extrayendo... {}/{}", i, total)
+                );
             }
         }
     } else {
         // tar.gz (Linux/Mac)
         let tar_gz = std::fs::File::open(&archive_path)
             .map_err(|e| format!("Error abriendo tar.gz: {}", e))?;
-        let decompressed = GzDecoder::new(tar_gz);
-        let mut archive = TarArchive::new(decompressed);
-        for entry in archive.entries().map_err(|e| format!("Error leyendo tar: {}", e))? {
+        let decompressed = flate2::read::GzDecoder::new(tar_gz);
+        let mut archive = tar::Archive::new(decompressed);
+        for entry in archive
+            .entries()
+            .map_err(|e| format!("Error leyendo tar: {}", e))?
+        {
             let mut entry = entry.map_err(|e| format!("Error en entrada tar: {}", e))?;
             let entry_path = entry.path().map_err(|e| e.to_string())?.to_path_buf();
             let mut components = entry_path.components();
             components.next();
             let stripped: PathBuf = components.collect();
-            if stripped.as_os_str().is_empty() { continue; }
+            if stripped.as_os_str().is_empty() {
+                continue;
+            }
             entry.unpack(java_dir.join(&stripped)).ok();
         }
     }
@@ -1604,7 +1655,7 @@ async fn install_java_runtime(
     // ── Agregar automáticamente al PATH del usuario ──────────────────────────
     let java_bin_dir = java_dir.join("bin");
     match add_to_user_path_internal(&java_bin_dir.to_string_lossy()) {
-        Ok(_)  => eprintln!("[Java] ✓ Agregado al PATH: {}", java_bin_dir.display()),
+        Ok(_) => eprintln!("[Java] ✓ Agregado al PATH: {}", java_bin_dir.display()),
         Err(e) => eprintln!("[Java] ⚠ No se pudo agregar al PATH: {}", e),
     }
 
@@ -1621,13 +1672,17 @@ fn add_to_user_path_internal(new_dir: &str) -> Result<(), String> {
         use winreg::RegKey;
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let env = hkcu.open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)
+        let env = hkcu
+            .open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)
             .map_err(|e| format!("No se pudo abrir registro: {}", e))?;
 
         let current_path: String = env.get_value("Path").unwrap_or_default();
 
         // No agregar si ya está
-        if current_path.split(';').any(|p| p.trim().eq_ignore_ascii_case(new_dir)) {
+        if current_path
+            .split(';')
+            .any(|p| p.trim().eq_ignore_ascii_case(new_dir))
+        {
             eprintln!("[Path] Ya existe en PATH: {}", new_dir);
             return Ok(());
         }
@@ -1646,8 +1701,7 @@ fn add_to_user_path_internal(new_dir: &str) -> Result<(), String> {
         // Notificar a Windows del cambio de entorno
         use std::ffi::OsStr;
         use std::os::windows::ffi::OsStrExt;
-        let env_wide: Vec<u16> = OsStr::new("Environment\0")
-            .encode_wide().collect();
+        let env_wide: Vec<u16> = OsStr::new("Environment\0").encode_wide().collect();
         winapi_broadcast_setting_change(&env_wide);
 
         Ok(())
@@ -1663,8 +1717,12 @@ fn add_to_user_path_internal(new_dir: &str) -> Result<(), String> {
                 if let Ok(content) = std::fs::read_to_string(&rc_path) {
                     if !content.contains(new_dir) {
                         let _ = std::fs::OpenOptions::new()
-                            .append(true).open(&rc_path)
-                            .and_then(|mut f| { use std::io::Write; f.write_all(export_line.as_bytes()) });
+                            .append(true)
+                            .open(&rc_path)
+                            .and_then(|mut f| {
+                                use std::io::Write;
+                                f.write_all(export_line.as_bytes())
+                            });
                     }
                 }
             }
@@ -1707,15 +1765,19 @@ fn winapi_broadcast_setting_change(env_wide: &[u16]) {
 // ─────────────────────────────────────────────────────────────────────────────
 #[derive(serde::Serialize)]
 struct JavaValidation {
-    valid:   bool,
-    reason:  String,
+    valid: bool,
+    reason: String,
     version: String,
 }
 
 #[tauri::command]
 async fn validate_java(java_path: String) -> JavaValidation {
     if java_path.is_empty() {
-        return JavaValidation { valid: false, reason: "Ruta vacía".into(), version: String::new() };
+        return JavaValidation {
+            valid: false,
+            reason: "Ruta vacía".into(),
+            version: String::new(),
+        };
     }
 
     let path = std::path::Path::new(&java_path);
@@ -1730,16 +1792,27 @@ async fn validate_java(java_path: String) -> JavaValidation {
     let mut val_cmd = std::process::Command::new(&java_path);
     val_cmd.arg("-version");
     #[cfg(target_os = "windows")]
-    { use std::os::windows::process::CommandExt; val_cmd.creation_flags(0x08000000); }
+    {
+        use std::os::windows::process::CommandExt;
+        val_cmd.creation_flags(0x08000000);
+    }
     match val_cmd.output() {
         Ok(output) => {
             let ver_str = String::from_utf8_lossy(&output.stderr).to_string()
                 + &String::from_utf8_lossy(&output.stdout);
             let first_line = ver_str.lines().next().unwrap_or("").to_string();
             if first_line.contains("version") {
-                JavaValidation { valid: true, reason: "OK".into(), version: first_line }
+                JavaValidation {
+                    valid: true,
+                    reason: "OK".into(),
+                    version: first_line,
+                }
             } else {
-                JavaValidation { valid: false, reason: "java -version no produjo salida válida".into(), version: first_line }
+                JavaValidation {
+                    valid: false,
+                    reason: "java -version no produjo salida válida".into(),
+                    version: first_line,
+                }
             }
         }
         Err(e) => JavaValidation {
@@ -1755,42 +1828,18 @@ async fn validate_java(java_path: String) -> JavaValidation {
 // ─────────────────────────────────────────────────────────────────────────────
 #[tauri::command]
 async fn extract_zip(zip_path: String, dest_dir: String) -> Result<(), String> {
-    let file = std::fs::File::open(&zip_path)
-        .map_err(|e| format!("No se pudo abrir ZIP: {}", e))?;
-
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| format!("No es un ZIP válido: {}", e))?;
-
-    std::fs::create_dir_all(&dest_dir)
-        .map_err(|e| format!("No se pudo crear directorio de destino: {}", e))?;
-
-    for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .map_err(|e| format!("Error leyendo archivo del ZIP: {}", e))?;
-
-        let file_path = PathBuf::from(&dest_dir).join(file.name());
-
-        // Saltar directorios
-        if file.is_dir() {
-            std::fs::create_dir_all(&file_path)
-                .map_err(|e| format!("Error creando directorio: {}", e))?;
-        } else {
-            // Crear directorio padre si no existe
-            if let Some(parent) = file_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("Error creando directorio padre: {}", e))?;
-            }
-
-            // Extraer archivo
-            let mut out_file = std::fs::File::create(&file_path)
-                .map_err(|e| format!("Error creando archivo: {}", e))?;
-            std::io::copy(&mut file, &mut out_file)
-                .map_err(|e| format!("Error extrayendo archivo: {}", e))?;
-        }
-    }
-
-    Ok(())
+    let destination = PathBuf::from(dest_dir);
+    let _lock = safe_fs::lock(&destination).await;
+    tokio::task::spawn_blocking(move || {
+        safe_fs::no_links(&destination)?;
+        let parent = destination.parent().ok_or("Destino inválido")?;
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        let stage = tempfile::tempdir_in(parent).map_err(|e| e.to_string())?;
+        archives::zip_to_stage(std::path::Path::new(&zip_path), stage.path(), false)?;
+        archives::copy_tree(stage.path(), &destination)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1807,7 +1856,9 @@ async fn create_dir_all(path: String) -> Result<(), String> {
 #[tauri::command]
 async fn remove_dir(path: String) -> Result<(), String> {
     let p = PathBuf::from(&path);
-    if !p.exists() { return Ok(()); }
+    if !p.exists() {
+        return Ok(());
+    }
     std::fs::remove_dir_all(&p).map_err(|e| e.to_string())
 }
 
@@ -1818,7 +1869,9 @@ async fn remove_dir(path: String) -> Result<(), String> {
 #[tauri::command]
 async fn copy_dir(src: String, dst: String) -> Result<(), String> {
     let src_path = PathBuf::from(&src);
-    if !src_path.exists() { return Ok(()); }
+    if !src_path.exists() {
+        return Ok(());
+    }
     let dst_path = PathBuf::from(&dst);
     copy_dir_recursive(&src_path, &dst_path)
 }
@@ -1830,11 +1883,13 @@ async fn copy_dir(src: String, dst: String) -> Result<(), String> {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PackInfo {
     pub filename: String,
-    pub name:     String,
+    pub name: String,
 }
 
 fn list_packs_in_dir(dir: &PathBuf) -> Vec<PackInfo> {
-    if !dir.exists() { return Vec::new(); }
+    if !dir.exists() {
+        return Vec::new();
+    }
     let mut packs = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -1850,17 +1905,34 @@ fn list_packs_in_dir(dir: &PathBuf) -> Vec<PackInfo> {
 }
 
 #[tauri::command]
-async fn list_resourcepacks(launcher_dir: String, instance_id: String) -> Result<Vec<PackInfo>, String> {
-    let dir = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("resourcepacks");
+async fn list_resourcepacks(
+    launcher_dir: String,
+    instance_id: String,
+) -> Result<Vec<PackInfo>, String> {
+    let dir = PathBuf::from(launcher_dir)
+        .join("instances")
+        .join(&instance_id)
+        .join("resourcepacks");
     Ok(list_packs_in_dir(&dir))
 }
 
 #[tauri::command]
-async fn add_resourcepack(launcher_dir: String, instance_id: String, src_path: String) -> Result<PackInfo, String> {
-    let dest_dir = PathBuf::from(&launcher_dir).join("instances").join(&instance_id).join("resourcepacks");
+async fn add_resourcepack(
+    launcher_dir: String,
+    instance_id: String,
+    src_path: String,
+) -> Result<PackInfo, String> {
+    let dest_dir = PathBuf::from(&launcher_dir)
+        .join("instances")
+        .join(&instance_id)
+        .join("resourcepacks");
     std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
     let src = PathBuf::from(&src_path);
-    let filename = src.file_name().ok_or("Nombre de archivo inválido")?.to_string_lossy().to_string();
+    let filename = src
+        .file_name()
+        .ok_or("Nombre de archivo inválido")?
+        .to_string_lossy()
+        .to_string();
     let dest = dest_dir.join(&filename);
     std::fs::copy(&src, &dest).map_err(|e| format!("Error copiando resource pack: {}", e))?;
     let name = filename.replace(".zip", "");
@@ -1868,8 +1940,16 @@ async fn add_resourcepack(launcher_dir: String, instance_id: String, src_path: S
 }
 
 #[tauri::command]
-async fn delete_resourcepack(launcher_dir: String, instance_id: String, filename: String) -> Result<(), String> {
-    let path = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("resourcepacks").join(&filename);
+async fn delete_resourcepack(
+    launcher_dir: String,
+    instance_id: String,
+    filename: String,
+) -> Result<(), String> {
+    let path = PathBuf::from(launcher_dir)
+        .join("instances")
+        .join(&instance_id)
+        .join("resourcepacks")
+        .join(&filename);
     if path.is_dir() {
         std::fs::remove_dir_all(&path).map_err(|e| e.to_string())
     } else {
@@ -1878,17 +1958,34 @@ async fn delete_resourcepack(launcher_dir: String, instance_id: String, filename
 }
 
 #[tauri::command]
-async fn list_shaderpacks(launcher_dir: String, instance_id: String) -> Result<Vec<PackInfo>, String> {
-    let dir = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("shaderpacks");
+async fn list_shaderpacks(
+    launcher_dir: String,
+    instance_id: String,
+) -> Result<Vec<PackInfo>, String> {
+    let dir = PathBuf::from(launcher_dir)
+        .join("instances")
+        .join(&instance_id)
+        .join("shaderpacks");
     Ok(list_packs_in_dir(&dir))
 }
 
 #[tauri::command]
-async fn add_shaderpack(launcher_dir: String, instance_id: String, src_path: String) -> Result<PackInfo, String> {
-    let dest_dir = PathBuf::from(&launcher_dir).join("instances").join(&instance_id).join("shaderpacks");
+async fn add_shaderpack(
+    launcher_dir: String,
+    instance_id: String,
+    src_path: String,
+) -> Result<PackInfo, String> {
+    let dest_dir = PathBuf::from(&launcher_dir)
+        .join("instances")
+        .join(&instance_id)
+        .join("shaderpacks");
     std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
     let src = PathBuf::from(&src_path);
-    let filename = src.file_name().ok_or("Nombre de archivo inválido")?.to_string_lossy().to_string();
+    let filename = src
+        .file_name()
+        .ok_or("Nombre de archivo inválido")?
+        .to_string_lossy()
+        .to_string();
     let dest = dest_dir.join(&filename);
     std::fs::copy(&src, &dest).map_err(|e| format!("Error copiando shaderpack: {}", e))?;
     let name = filename.replace(".zip", "");
@@ -1896,8 +1993,16 @@ async fn add_shaderpack(launcher_dir: String, instance_id: String, src_path: Str
 }
 
 #[tauri::command]
-async fn delete_shaderpack(launcher_dir: String, instance_id: String, filename: String) -> Result<(), String> {
-    let path = PathBuf::from(launcher_dir).join("instances").join(&instance_id).join("shaderpacks").join(&filename);
+async fn delete_shaderpack(
+    launcher_dir: String,
+    instance_id: String,
+    filename: String,
+) -> Result<(), String> {
+    let path = PathBuf::from(launcher_dir)
+        .join("instances")
+        .join(&instance_id)
+        .join("shaderpacks")
+        .join(&filename);
     if path.is_dir() {
         std::fs::remove_dir_all(&path).map_err(|e| e.to_string())
     } else {
@@ -1912,16 +2017,16 @@ async fn delete_shaderpack(launcher_dir: String, instance_id: String, filename: 
 /// Metadata extraída de un manifest.json de modpack CurseForge
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModpackInspect {
-    pub name:           String,
+    pub name: String,
     #[serde(rename = "version")]
-    pub mc_version:     String,
-    pub loader:         String,
+    pub mc_version: String,
+    pub loader: String,
     #[serde(rename = "loaderVersion")]
     pub loader_version: Option<String>,
     #[serde(rename = "modsCount")]
-    pub mods_count:     usize,
+    pub mods_count: usize,
     #[serde(rename = "hasOverrides")]
-    pub has_overrides:  bool,
+    pub has_overrides: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1929,20 +2034,20 @@ pub struct ModToDownload {
     #[serde(rename = "projectID")]
     pub project_id: u32,
     #[serde(rename = "fileID")]
-    pub file_id:    u32,
-    pub required:   bool,
-    pub name:       Option<String>,
+    pub file_id: u32,
+    pub required: bool,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImportInstanceResult {
     #[serde(rename = "newInstanceId")]
     pub new_instance_id: String,
-    pub name:            String,
-    pub version:         String,
-    pub loader:          String,
+    pub name: String,
+    pub version: String,
+    pub loader: String,
     #[serde(rename = "loaderVersion")]
-    pub loader_version:  Option<String>,
+    pub loader_version: Option<String>,
 }
 
 /// Parsea el manifest.json de CurseForge desde un directorio ya extraído
@@ -1950,11 +2055,20 @@ fn parse_curseforge_manifest(dir: &PathBuf) -> Result<(serde_json::Value, Modpac
     let manifest_path = dir.join("manifest.json");
     let content = std::fs::read_to_string(&manifest_path)
         .map_err(|_| "No se encontró manifest.json en el directorio".to_string())?;
-    let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Error parseando manifest.json: {}", e))?;
+    parse_curseforge_json(&content, dir.join("overrides").exists())
+}
+
+fn parse_curseforge_json(
+    content: &str,
+    has_overrides: bool,
+) -> Result<(serde_json::Value, ModpackInspect), String> {
+    let json: serde_json::Value = serde_json::from_str(content).map_err(|e| e.to_string())?;
 
     let name = json["name"].as_str().unwrap_or("Modpack").to_string();
-    let mc_version = json["minecraft"]["version"].as_str().unwrap_or("1.20.1").to_string();
+    let mc_version = json["minecraft"]["version"]
+        .as_str()
+        .unwrap_or("1.20.1")
+        .to_string();
 
     // Parsear loader desde modLoaders[0].id  → ej: "forge-47.1.0"
     let loader_raw = json["minecraft"]["modLoaders"]
@@ -1971,20 +2085,26 @@ fn parse_curseforge_manifest(dir: &PathBuf) -> Result<(serde_json::Value, Modpac
     };
 
     let mods_count = json["files"].as_array().map(|a| a.len()).unwrap_or(0);
-    let has_overrides = dir.join("overrides").exists();
+    safe_fs::filename(&mc_version)?;
+    if let Some(version) = &loader_version {
+        safe_fs::filename(version)?;
+    }
 
     // For loaders like Forge/NeoForge, the loader_version needs to be the FULL version
     // (including MC version), not just the loader version number.
     // E.g.: manifest has "forge-43.5.0" for MC 1.19.2 → should become "1.19.2-43.5.0"
     let full_loader_version = match &loader as &str {
-        "forge" | "neoforge" => {
-            loader_version.map(|v| format!("{}-{}", mc_version, v))
-        }
+        "forge" | "neoforge" => loader_version.map(|v| format!("{}-{}", mc_version, v)),
         _ => loader_version, // Fabric, Quilt don't need this transformation
     };
 
     let inspect = ModpackInspect {
-        name, mc_version, loader, loader_version: full_loader_version, mods_count, has_overrides,
+        name,
+        mc_version,
+        loader,
+        loader_version: full_loader_version,
+        mods_count,
+        has_overrides,
     };
     Ok((json, inspect))
 }
@@ -1998,32 +2118,23 @@ async fn inspect_instance_folder(folder_path: String) -> Result<ModpackInspect, 
 
 #[tauri::command]
 async fn inspect_instance_zip(zip_path: String) -> Result<ModpackInspect, String> {
-    // Extraer a directorio temporal para inspección
-    let temp_dir = std::env::temp_dir().join(format!("minecrack_inspect_{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()));
-    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
-
-    let file = std::fs::File::open(&zip_path).map_err(|e| format!("No se pudo abrir ZIP: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("ZIP inválido: {}", e))?;
-
-    // Solo extraer manifest.json para la inspección
-    let manifest_content = {
-        let mut mf = archive.by_name("manifest.json")
-            .map_err(|_| "El ZIP no contiene manifest.json — ¿es un modpack de CurseForge?".to_string())?;
+    tokio::task::spawn_blocking(move || {
+        let file = std::fs::File::open(zip_path).map_err(|e| e.to_string())?;
+        let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
         let mut content = String::new();
-        mf.read_to_string(&mut content).map_err(|e| e.to_string())?;
-        content
-    };
-    let _ = std::fs::remove_dir_all(&temp_dir);
-
-    // Escribir en temp para parsear
-    let temp_manifest = std::env::temp_dir().join("minecrack_manifest_temp.json");
-    std::fs::write(&temp_manifest, &manifest_content).map_err(|e| e.to_string())?;
-    let dir_for_parse = std::env::temp_dir();
-    // Renombrar para que parse_curseforge_manifest lo encuentre
-    std::fs::write(dir_for_parse.join("manifest.json"), &manifest_content).map_err(|e| e.to_string())?;
-    let (_, inspect) = parse_curseforge_manifest(&dir_for_parse)?;
-    Ok(inspect)
+        archive
+            .by_name("manifest.json")
+            .map_err(|e| e.to_string())?
+            .take(safe_fs::MAX_JSON + 1)
+            .read_to_string(&mut content)
+            .map_err(|e| e.to_string())?;
+        if content.len() as u64 > safe_fs::MAX_JSON {
+            return Err("Manifiesto demasiado grande".into());
+        }
+        parse_curseforge_json(&content, false).map(|(_, inspect)| inspect)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -2037,8 +2148,8 @@ async fn get_mods_to_download(instance_path: String) -> Result<Vec<ModToDownload
         .iter()
         .filter_map(|f| {
             let project_id = f["projectID"].as_u64()? as u32;
-            let file_id    = f["fileID"].as_u64()? as u32;
-            let required   = f["required"].as_bool().unwrap_or(true);
+            let file_id = f["fileID"].as_u64()? as u32;
+            let required = f["required"].as_bool().unwrap_or(true);
             Some(ModToDownload {
                 project_id,
                 file_id,
@@ -2085,7 +2196,11 @@ async fn import_instance_from_folder(
     std::fs::create_dir_all(instances_dir.join("mods")).map_err(|e| e.to_string())?;
 
     // Nombre final de la instancia
-    let final_name = if new_name.trim().is_empty() { inspect.name.clone() } else { new_name.trim().to_string() };
+    let final_name = if new_name.trim().is_empty() {
+        inspect.name.clone()
+    } else {
+        new_name.trim().to_string()
+    };
 
     // Agregar entrada en instances.json
     let instances_file = PathBuf::from(&launcher_dir).join("instances.json");
@@ -2098,8 +2213,8 @@ async fn import_instance_from_folder(
 
     let now = Utc::now().to_rfc3339();
     let instance_icon = icon.unwrap_or_else(|| "📦".to_string());
-    let instance_ram  = ram.unwrap_or(2048);
-    let instance_jvm  = jvm_args.unwrap_or_default();
+    let instance_ram = ram.unwrap_or(2048);
+    let instance_jvm = jvm_args.unwrap_or_default();
     instances.push(serde_json::json!({
         "id": new_id,
         "name": final_name,
@@ -2121,10 +2236,10 @@ async fn import_instance_from_folder(
 
     Ok(ImportInstanceResult {
         new_instance_id: new_id,
-        name:            final_name,
-        version:         inspect.mc_version,
-        loader:          inspect.loader,
-        loader_version:  inspect.loader_version,
+        name: final_name,
+        version: inspect.mc_version,
+        loader: inspect.loader,
+        loader_version: inspect.loader_version,
     })
 }
 
@@ -2134,74 +2249,39 @@ async fn import_instance_from_zip(
     zip_path: String,
     new_name: String,
 ) -> Result<ImportInstanceResult, String> {
-    // Extraer ZIP a directorio temporal
-    let temp_id = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
-    let temp_dir = PathBuf::from(&launcher_dir).join(format!("temp-import-{}", temp_id));
-    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
-
-    // Extraer el ZIP completo
-    let file = std::fs::File::open(&zip_path).map_err(|e| format!("No se pudo abrir ZIP: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("ZIP inválido: {}", e))?;
-
-    for i in 0..archive.len() {
-        let mut zf = archive.by_index(i).map_err(|e| e.to_string())?;
-        let out_path = temp_dir.join(zf.name());
-        if zf.is_dir() {
-            std::fs::create_dir_all(&out_path).map_err(|e| e.to_string())?;
-        } else {
-            if let Some(parent) = out_path.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
-            let mut out_file = std::fs::File::create(&out_path).map_err(|e| e.to_string())?;
-            std::io::copy(&mut zf, &mut out_file).map_err(|e| e.to_string())?;
-        }
-    }
-
-    // Importar desde la carpeta temporal
-    let result = import_instance_from_folder(launcher_dir, temp_dir.to_string_lossy().to_string(), new_name, None, None, None).await;
-
-    // Limpiar directorio temporal
-    let _ = std::fs::remove_dir_all(&temp_dir);
-
-    result
+    let stage = tempfile::tempdir_in(&launcher_dir).map_err(|e| e.to_string())?;
+    let stage_path = stage.path().to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        archives::zip_to_stage(std::path::Path::new(&zip_path), &stage_path, false)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    import_instance_from_folder(
+        launcher_dir,
+        stage.path().to_string_lossy().into_owned(),
+        new_name,
+        None,
+        None,
+        None,
+    )
+    .await
 }
 
 #[tauri::command]
 async fn read_file_base64(path: String) -> Result<String, String> {
-    use base64::{Engine as _, engine::general_purpose};
-    let bytes = std::fs::read(&path).map_err(|e| format!("Error leyendo archivo: {}", e))?;
+    use base64::{engine::general_purpose, Engine as _};
+    let bytes = safe_fs::bounded_read(std::path::Path::new(&path), 16 * 1024 * 1024)?;
     Ok(general_purpose::STANDARD.encode(&bytes))
 }
 
 /// Genera un UUID v4 simple (sin dependencia externa)
 fn uuid_v4() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
-    format!(
-        "{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
-        t.as_secs() as u32,
-        (t.subsec_nanos() >> 16) & 0xffff,
-        (t.subsec_nanos() >> 4) & 0x0fff,
-        0x8000 | ((t.subsec_nanos()) & 0x3fff),
-        t.as_nanos() & 0xffffffffffff
-    )
+    uuid::Uuid::new_v4().to_string()
 }
 
 /// Copia recursivamente src_dir en dest_dir
 fn copy_dir_recursive(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
-    std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
-    for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let src_path = entry.path();
-        let dest_path = dest.join(entry.file_name());
-        if src_path.is_dir() {
-            copy_dir_recursive(&src_path, &dest_path)?;
-        } else {
-            std::fs::copy(&src_path, &dest_path).map_err(|e| format!("Error copiando {}: {}", src_path.display(), e))?;
-        }
-    }
-    Ok(())
+    archives::copy_tree(src, dest)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2311,7 +2391,8 @@ async fn verify_instance(
 
                     files.push(FileInfo {
                         path: lib_path.to_string_lossy().to_string(),
-                        label: lib.get("name")
+                        label: lib
+                            .get("name")
                             .and_then(|n| n.as_str())
                             .unwrap_or(path_str)
                             .to_string(),
@@ -2324,7 +2405,8 @@ async fn verify_instance(
                         if lib_path.exists() {
                             corrupt.push(FileInfo {
                                 path: lib_path.to_string_lossy().to_string(),
-                                label: lib.get("name")
+                                label: lib
+                                    .get("name")
                                     .and_then(|n| n.as_str())
                                     .unwrap_or(path_str)
                                     .to_string(),
@@ -2334,7 +2416,8 @@ async fn verify_instance(
                         } else {
                             missing.push(FileInfo {
                                 path: lib_path.to_string_lossy().to_string(),
-                                label: lib.get("name")
+                                label: lib
+                                    .get("name")
                                     .and_then(|n| n.as_str())
                                     .unwrap_or(path_str)
                                     .to_string(),
@@ -2349,62 +2432,82 @@ async fn verify_instance(
     }
 
     // ── Loader profile si no es vanilla ───────────────────────────────────────
-    let loader = instance.get("loader").and_then(|l| l.as_str()).unwrap_or("vanilla");
+    let loader = instance
+        .get("loader")
+        .and_then(|l| l.as_str())
+        .unwrap_or("vanilla");
     let loader_version = instance.get("loaderVersion").and_then(|lv| lv.as_str());
 
     if loader != "vanilla" {
         if let Some(ver) = loader_version {
             if let Ok(profile_id) = build_loader_profile_id(loader, ver, mc_version) {
-            let profile_path = launcher_path
-                .join("versions")
-                .join(&profile_id)
-                .join(format!("{}.json", profile_id));
+                let profile_path = launcher_path
+                    .join("versions")
+                    .join(&profile_id)
+                    .join(format!("{}.json", profile_id));
 
-            if let Ok(profile_data) = std::fs::read_to_string(&profile_path) {
-                if let Ok(profile_json) = serde_json::from_str::<serde_json::Value>(&profile_data) {
-                    // Procesar libraries del loader
-                    if let Some(loader_libs) = profile_json.get("libraries").and_then(|l| l.as_array()) {
-                        for lib in loader_libs {
-                            if let Some(artifact) = lib.get("downloads").and_then(|d| d.get("artifact")) {
-                                if let (Some(path_str), Some(url), Some(sha1)) = (
-                                    artifact.get("path").and_then(|p| p.as_str()),
-                                    artifact.get("url").and_then(|u| u.as_str()),
-                                    artifact.get("sha1").and_then(|s| s.as_str()),
-                                ) {
-                                    let lib_path = launcher_path.join("libraries").join(path_str);
+                if let Ok(profile_data) = std::fs::read_to_string(&profile_path) {
+                    if let Ok(profile_json) =
+                        serde_json::from_str::<serde_json::Value>(&profile_data)
+                    {
+                        // Procesar libraries del loader
+                        if let Some(loader_libs) =
+                            profile_json.get("libraries").and_then(|l| l.as_array())
+                        {
+                            for lib in loader_libs {
+                                if let Some(artifact) =
+                                    lib.get("downloads").and_then(|d| d.get("artifact"))
+                                {
+                                    if let (Some(path_str), Some(url), Some(sha1)) = (
+                                        artifact.get("path").and_then(|p| p.as_str()),
+                                        artifact.get("url").and_then(|u| u.as_str()),
+                                        artifact.get("sha1").and_then(|s| s.as_str()),
+                                    ) {
+                                        let lib_path =
+                                            launcher_path.join("libraries").join(path_str);
 
-                                    files.push(FileInfo {
-                                        path: lib_path.to_string_lossy().to_string(),
-                                        label: format!("[{}] {}", loader,
-                                            lib.get("name")
-                                                .and_then(|n| n.as_str())
-                                                .unwrap_or(path_str)),
-                                        sha1: Some(sha1.to_string()),
-                                        url: Some(url.to_string()),
-                                    });
+                                        files.push(FileInfo {
+                                            path: lib_path.to_string_lossy().to_string(),
+                                            label: format!(
+                                                "[{}] {}",
+                                                loader,
+                                                lib.get("name")
+                                                    .and_then(|n| n.as_str())
+                                                    .unwrap_or(path_str)
+                                            ),
+                                            sha1: Some(sha1.to_string()),
+                                            url: Some(url.to_string()),
+                                        });
 
-                                    // Verificar
-                                    if !check_file_sha1(&lib_path, sha1) {
-                                        if lib_path.exists() {
-                                            corrupt.push(FileInfo {
-                                                path: lib_path.to_string_lossy().to_string(),
-                                                label: format!("[{}] {}", loader,
-                                                    lib.get("name")
-                                                        .and_then(|n| n.as_str())
-                                                        .unwrap_or(path_str)),
-                                                sha1: Some(sha1.to_string()),
-                                                url: Some(url.to_string()),
-                                            });
-                                        } else {
-                                            missing.push(FileInfo {
-                                                path: lib_path.to_string_lossy().to_string(),
-                                                label: format!("[{}] {}", loader,
-                                                    lib.get("name")
-                                                        .and_then(|n| n.as_str())
-                                                        .unwrap_or(path_str)),
-                                                sha1: Some(sha1.to_string()),
-                                                url: Some(url.to_string()),
-                                            });
+                                        // Verificar
+                                        if !check_file_sha1(&lib_path, sha1) {
+                                            if lib_path.exists() {
+                                                corrupt.push(FileInfo {
+                                                    path: lib_path.to_string_lossy().to_string(),
+                                                    label: format!(
+                                                        "[{}] {}",
+                                                        loader,
+                                                        lib.get("name")
+                                                            .and_then(|n| n.as_str())
+                                                            .unwrap_or(path_str)
+                                                    ),
+                                                    sha1: Some(sha1.to_string()),
+                                                    url: Some(url.to_string()),
+                                                });
+                                            } else {
+                                                missing.push(FileInfo {
+                                                    path: lib_path.to_string_lossy().to_string(),
+                                                    label: format!(
+                                                        "[{}] {}",
+                                                        loader,
+                                                        lib.get("name")
+                                                            .and_then(|n| n.as_str())
+                                                            .unwrap_or(path_str)
+                                                    ),
+                                                    sha1: Some(sha1.to_string()),
+                                                    url: Some(url.to_string()),
+                                                });
+                                            }
                                         }
                                     }
                                 }
@@ -2412,7 +2515,6 @@ async fn verify_instance(
                         }
                     }
                 }
-            }
             }
         }
     }
@@ -2434,7 +2536,11 @@ async fn verify_instance(
 }
 
 // Helper: construir profile ID según el loader
-fn build_loader_profile_id(loader: &str, loader_version: &str, mc_version: &str) -> Result<String, String> {
+fn build_loader_profile_id(
+    loader: &str,
+    loader_version: &str,
+    mc_version: &str,
+) -> Result<String, String> {
     match loader {
         "fabric" => Ok(format!("{}-fabric-{}", mc_version, loader_version)),
         "quilt" => Ok(format!("{}-quilt-{}", mc_version, loader_version)),
@@ -2445,13 +2551,9 @@ fn build_loader_profile_id(loader: &str, loader_version: &str, mc_version: &str)
 
 // Helper: verificar SHA1 de un archivo
 fn check_file_sha1(path: &PathBuf, expected_sha1: &str) -> bool {
-    match std::fs::read(path) {
-        Ok(data) => {
-            let hash = format!("{:x}", Sha1::digest(&data));
-            hash == expected_sha1.to_lowercase()
-        }
-        Err(_) => false,
-    }
+    safe_fs::sha1(path)
+        .map(|hash| hash.eq_ignore_ascii_case(expected_sha1))
+        .unwrap_or(false)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2504,12 +2606,18 @@ mod tests {
     // ── parse_java_major ──────────────────────────────────────────────────────
     #[test]
     fn parse_java_major_modern() {
-        assert_eq!(parse_java_major(r#"openjdk version "21.0.1" 2023-10-17"#), 21);
+        assert_eq!(
+            parse_java_major(r#"openjdk version "21.0.1" 2023-10-17"#),
+            21
+        );
     }
 
     #[test]
     fn parse_java_major_java17() {
-        assert_eq!(parse_java_major(r#"openjdk version "17.0.9" 2023-10-17"#), 17);
+        assert_eq!(
+            parse_java_major(r#"openjdk version "17.0.9" 2023-10-17"#),
+            17
+        );
     }
 
     #[test]
@@ -2553,13 +2661,15 @@ mod tests {
     fn mods_zip_manifest_roundtrip() {
         let manifest = ModsZipManifest {
             minecrack_version: "0.1.0".to_string(),
-            instance_name:     "Test".to_string(),
-            mc_version:        "1.20.1".to_string(),
-            loader:            "fabric".to_string(),
-            loader_version:    Some("0.15.0".to_string()),
-            mods: vec![
-                ModsZipEntry { filename: "sodium.jar".to_string(), sha1: None, enabled: true },
-            ],
+            instance_name: "Test".to_string(),
+            mc_version: "1.20.1".to_string(),
+            loader: "fabric".to_string(),
+            loader_version: Some("0.15.0".to_string()),
+            mods: vec![ModsZipEntry {
+                filename: "sodium.jar".to_string(),
+                sha1: None,
+                enabled: true,
+            }],
         };
         let json = serde_json::to_string(&manifest).unwrap();
         let back: ModsZipManifest = serde_json::from_str(&json).unwrap();
@@ -2572,7 +2682,7 @@ mod tests {
     #[test]
     fn mods_dir_path_builds_correctly() {
         let base = PathBuf::from("/home/user/.local/minecrack");
-        let id   = "abc-123";
+        let id = "abc-123";
         let mods = base.join("instances").join(id).join("mods");
         assert!(mods.to_string_lossy().contains("instances"));
         assert!(mods.to_string_lossy().contains("mods"));
@@ -2584,56 +2694,76 @@ mod tests {
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+        authority::select_path,
+        transfers::cancel_downloads,
+        processes::stop_game,
+        get_launcher_dir,
+        ensure_dir,
+        create_dir_all,
+        write_file,
+        read_file,
+        delete_file,
+        write_file_base64,
+        copy_file,
+        file_exists,
+        download_file,
+        prepare_game_launch,
+        launch_game,
+        detect_java,
+        list_mods,
+        delete_mod,
+        toggle_mod,
+        export_instance_mods,
+        import_instance_mods,
+        inspect_mods_zip,
+        install_java_runtime,
+        validate_java,
+        download_mod,
+        download_resourcepack,
+        download_shaderpack,
+        verify_instance,
+        get_repair_tasks,
+        extract_zip,
+        remove_dir,
+        copy_dir,
+        // Fix 4: Resource packs & Shaderpacks
+        list_resourcepacks,
+        add_resourcepack,
+        delete_resourcepack,
+        list_shaderpacks,
+        add_shaderpack,
+        delete_shaderpack,
+        // Fix 5: Import de instancias
+        inspect_instance_folder,
+        inspect_instance_zip,
+        get_mods_to_download,
+        import_instance_from_folder,
+        import_instance_from_zip,
+        read_file_base64,
+        sync::sync_instance,
+        sync::restore_quarantine,
+    ];
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![
-            get_launcher_dir,
-            ensure_dir,
-            create_dir_all,
-            write_file,
-            read_file,
-            delete_file,
-            write_file_base64,
-            copy_file,
-            file_exists,
-            download_file,
-            prepare_game_launch,
-            launch_game,
-            detect_java,
-            list_mods,
-            delete_mod,
-            toggle_mod,
-            export_instance_mods,
-            import_instance_mods,
-            inspect_mods_zip,
-            install_java_runtime,
-            validate_java,
-            download_mod,
-            download_resourcepack,
-            download_shaderpack,
-            verify_instance,
-            get_repair_tasks,
-            extract_zip,
-            remove_dir,
-            copy_dir,
-            // Fix 4: Resource packs & Shaderpacks
-            list_resourcepacks,
-            add_resourcepack,
-            delete_resourcepack,
-            list_shaderpacks,
-            add_shaderpack,
-            delete_shaderpack,
-            // Fix 5: Import de instancias
-            inspect_instance_folder,
-            inspect_instance_zip,
-            get_mods_to_download,
-            import_instance_from_folder,
-            import_instance_from_zip,
-            read_file_base64,
-            sync::sync_instance,
-            sync::restore_quarantine,
-        ])
+        .invoke_handler(move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
+            if invoke.message.webview_ref().label() != "main" {
+                invoke.resolver.reject("Ventana no autorizada");
+                return true;
+            }
+            let result = match invoke.message.payload() {
+                tauri::ipc::InvokeBody::Json(args) => {
+                    authority::validate(invoke.message.command(), args)
+                }
+                _ => Err("Payload IPC inválido".into()),
+            };
+            if let Err(error) = result {
+                invoke.resolver.reject(error);
+                return true;
+            }
+            handler(invoke)
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

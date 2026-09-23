@@ -165,6 +165,9 @@ function reducer(state, action) {
       return { ...state, gameLogs: [...state.gameLogs.slice(-499), logEntry] };
     }
 
+    case 'CLEAR_GAME_LOGS':
+      return { ...state, gameLogs: [] };
+
     case 'SET_ERROR':
       return { ...state, errorMessage: action.payload };
 

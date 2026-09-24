@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { exportInstance, getLauncherDir, pickFolder } from '../lib/tauri';
 import ProgressBar from './ui/ProgressBar';
 import ErrorModal from './ui/ErrorModal';
+import Modal from './ui/Modal';
 import './ExportInstanceModal.css';
 
 export default function ExportInstanceModal({ instance, onClose }) {
@@ -110,160 +111,157 @@ export default function ExportInstanceModal({ instance, onClose }) {
     );
   }
 
-  // Pantalla de exportación en progreso
+  // Pantalla de exportación en progreso (overlay y × no cerraban: se conserva)
   if (step === 'exporting' || step === 'done') {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content export-instance-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>{step === 'done' ? '✓ Exportado' : '💾 Exportando instancia'}</h2>
+      <Modal
+        open
+        onClose={onClose}
+        title={step === 'done' ? 'Exportado' : 'Exportando instancia'}
+        icon={step === 'done' ? '✓' : '💾'}
+        contentClassName="export-instance-modal"
+        showClose={false}
+        closeOnOverlay={false}
+        footer={
+          step !== 'done' ? (
+            <button className="btn btn-ghost" onClick={onClose} disabled={step === 'done'}>
+              Cancelar
+            </button>
+          ) : null
+        }
+      >
+        {step === 'done' ? (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 12 }}>✓</div>
+            <p style={{ color: 'var(--text-primary)', fontSize: 14, margin: 0 }}>
+              Instancia exportada correctamente
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8, margin: 0 }}>
+              {exportResult.size} MB • {exportResult.itemsCount} elemento(s)
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8, margin: 0, wordBreak: 'break-all' }}>
+              {exportResult.path}
+            </p>
           </div>
-
-          <div className="modal-body" style={{ paddingTop: 24 }}>
-            {step === 'done' ? (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 12 }}>✓</div>
-                <p style={{ color: 'var(--text-primary)', fontSize: 14, margin: 0 }}>
-                  Instancia exportada correctamente
-                </p>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8, margin: 0 }}>
-                  {exportResult.size} MB • {exportResult.itemsCount} elemento(s)
-                </p>
-                <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8, margin: 0, wordBreak: 'break-all' }}>
-                  {exportResult.path}
-                </p>
-              </div>
-            ) : (
-              <>
-                <ProgressBar
-                  value={progress}
-                  max={100}
-                  label={`${Math.round(progress)}%`}
-                  animated
-                  style={{ marginBottom: 16 }}
-                />
-                <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
-                  Comprimiendo y copiando archivos...
-                </p>
-              </>
-            )}
-          </div>
-
-          {step !== 'done' && (
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={onClose} disabled={step === 'done'}>
-                Cancelar
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+        ) : (
+          <>
+            <ProgressBar
+              value={progress}
+              max={100}
+              label={`${Math.round(progress)}%`}
+              animated
+              style={{ marginBottom: 16 }}
+            />
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
+              Comprimiendo y copiando archivos...
+            </p>
+          </>
+        )}
+      </Modal>
     );
   }
 
-  // Pantalla de opciones
+  // Pantalla de opciones (overlay y × cerraban: closeOnOverlay por defecto)
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content export-instance-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>💾 Backup de instancia</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="modal-body">
-          {/* Contenido a incluir */}
-          <div className="export-section">
-            <h3>¿Qué incluir?</h3>
-            <div className="export-checklist">
-              <label className="export-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedItems.mods}
-                  onChange={() => handleToggleItem('mods')}
-                />
-                <span>🧩 Mods</span>
-                <span className="export-checkbox-desc">Todos los mods instalados</span>
-              </label>
-              <label className="export-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedItems.config}
-                  onChange={() => handleToggleItem('config')}
-                />
-                <span>⚙️ Configuración</span>
-                <span className="export-checkbox-desc">Configuración de mods y launcher</span>
-              </label>
-              <label className="export-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedItems.saves}
-                  onChange={() => handleToggleItem('saves')}
-                />
-                <span>🌍 Mundos/Saves</span>
-                <span className="export-checkbox-desc">Todos los mundos jugados</span>
-              </label>
-              <label className="export-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedItems.resourcepacks}
-                  onChange={() => handleToggleItem('resourcepacks')}
-                />
-                <span>🎨 Resource packs</span>
-                <span className="export-checkbox-desc">Texture packs y shaders</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Formato de exportación */}
-          <div className="export-section">
-            <h3>Formato</h3>
-            <div className="export-format-buttons">
-              <button
-                className={`export-format-btn ${exportFormat === 'zip' ? 'active' : ''}`}
-                onClick={() => handleSelectFormat('zip')}
-              >
-                <span style={{ fontSize: 16 }}>📦</span>
-                <div>
-                  <div className="export-format-title">ZIP</div>
-                  <div className="export-format-desc">Comprimido, portable</div>
-                </div>
-              </button>
-              <button
-                className={`export-format-btn ${exportFormat === 'folder' ? 'active' : ''}`}
-                onClick={() => handleSelectFormat('folder')}
-              >
-                <span style={{ fontSize: 16 }}>📁</span>
-                <div>
-                  <div className="export-format-title">Carpeta</div>
-                  <div className="export-format-desc">Sin comprimir, directo</div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Ubicación */}
-          <div className="export-section">
-            <h3>Ubicación</h3>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>
-                {exportPath ? exportPath : '/exports (por defecto)'}
-              </span>
-              <button className="btn btn-ghost btn-sm" onClick={handleChooseLocation}>
-                📁 Cambiar
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="modal-footer">
+    <Modal
+      open
+      onClose={onClose}
+      title="Backup de instancia"
+      icon="💾"
+      contentClassName="export-instance-modal"
+      footer={
+        <>
           <button className="btn btn-ghost" onClick={onClose}>
             Cancelar
           </button>
           <button className="btn btn-primary" onClick={handleExport}>
             💾 Exportar
           </button>
+        </>
+      }
+    >
+      {/* Contenido a incluir */}
+      <div className="export-section">
+        <h3>¿Qué incluir?</h3>
+        <div className="export-checklist">
+          <label className="export-checkbox">
+            <input
+              type="checkbox"
+              checked={selectedItems.mods}
+              onChange={() => handleToggleItem('mods')}
+            />
+            <span>🧩 Mods</span>
+            <span className="export-checkbox-desc">Todos los mods instalados</span>
+          </label>
+          <label className="export-checkbox">
+            <input
+              type="checkbox"
+              checked={selectedItems.config}
+              onChange={() => handleToggleItem('config')}
+            />
+            <span>⚙️ Configuración</span>
+            <span className="export-checkbox-desc">Configuración de mods y launcher</span>
+          </label>
+          <label className="export-checkbox">
+            <input
+              type="checkbox"
+              checked={selectedItems.saves}
+              onChange={() => handleToggleItem('saves')}
+            />
+            <span>🌍 Mundos/Saves</span>
+            <span className="export-checkbox-desc">Todos los mundos jugados</span>
+          </label>
+          <label className="export-checkbox">
+            <input
+              type="checkbox"
+              checked={selectedItems.resourcepacks}
+              onChange={() => handleToggleItem('resourcepacks')}
+            />
+            <span>🎨 Resource packs</span>
+            <span className="export-checkbox-desc">Texture packs y shaders</span>
+          </label>
         </div>
       </div>
-    </div>
+
+      {/* Formato de exportación */}
+      <div className="export-section">
+        <h3>Formato</h3>
+        <div className="export-format-buttons">
+          <button
+            className={`export-format-btn ${exportFormat === 'zip' ? 'active' : ''}`}
+            onClick={() => handleSelectFormat('zip')}
+          >
+            <span style={{ fontSize: 16 }}>📦</span>
+            <div>
+              <div className="export-format-title">ZIP</div>
+              <div className="export-format-desc">Comprimido, portable</div>
+            </div>
+          </button>
+          <button
+            className={`export-format-btn ${exportFormat === 'folder' ? 'active' : ''}`}
+            onClick={() => handleSelectFormat('folder')}
+          >
+            <span style={{ fontSize: 16 }}>📁</span>
+            <div>
+              <div className="export-format-title">Carpeta</div>
+              <div className="export-format-desc">Sin comprimir, directo</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Ubicación */}
+      <div className="export-section">
+        <h3>Ubicación</h3>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>
+            {exportPath ? exportPath : '/exports (por defecto)'}
+          </span>
+          <button className="btn btn-ghost btn-sm" onClick={handleChooseLocation}>
+            📁 Cambiar
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }

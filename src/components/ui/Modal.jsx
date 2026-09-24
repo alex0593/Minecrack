@@ -51,12 +51,15 @@ export default function Modal({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, closeOnEsc, onClose]);
 
-  // Bloquear scroll del fondo + foco inicial en el diálogo
+  // Bloquear scroll del fondo + foco inicial en el diálogo (si el foco ya está
+  // dentro — p. ej. un input con autoFocus — no lo robamos)
   useEffect(() => {
     if (!open) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    if (dialogRef.current) dialogRef.current.focus();
+    if (dialogRef.current && !dialogRef.current.contains(document.activeElement)) {
+      dialogRef.current.focus();
+    }
     return () => {
       document.body.style.overflow = previousOverflow;
     };

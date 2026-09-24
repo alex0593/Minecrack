@@ -7,6 +7,7 @@ import {
   isCurseForgeConfigured,
 } from '../../lib/api/curseforge-modpacks';
 import ModpackCard from './ModpackCard';
+import Skeleton from '../ui/Skeleton';
 import './Step1Search.css';
 
 const MC_VERSIONS = ['1.21.4', '1.21.1', '1.20.1', '1.19.2', '1.18.2', '1.16.5', '1.12.2'];
@@ -143,9 +144,14 @@ export default function Step1Search({ onNext }) {
 
       {/* Loading state */}
       {loading && results.length === 0 && (
-        <div className="wizard-loading">
-          <div className="wizard-spinner"></div>
-          Cargando modpacks...
+        <div className="wizard-results-grid" role="status" aria-live="polite">
+          <span className="wizard-sr-only">Cargando modpacks...</span>
+          {Array.from({ length: 8 }, (_, i) => (
+            <div key={i} className="wizard-skeleton-card" aria-hidden="true">
+              <Skeleton lines={1} height={160} radius={10} />
+              <Skeleton lines={3} height={12} />
+            </div>
+          ))}
         </div>
       )}
 

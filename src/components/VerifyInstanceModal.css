@@ -1,27 +1,25 @@
-.verify-modal {
+.ui-modal.verify-modal {
   min-width: 480px;
   max-width: 600px;
   max-height: 80vh;
-  display: flex;
-  flex-direction: column;
 }
 
-.verify-modal .modal-content {
-  overflow-y: auto;
-}
-
+/* Los h4 de sección (ARCHIVOS FALTANTES / CORRUPTOS) */
 .verify-modal h4 {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
-  margin: 0 0 8px;
-  font-size: 12px;
+  margin: 0 0 var(--gap-sm);
+  font-size: var(--fs-sm);
 }
 
 @media (max-width: 768px) {
-  .verify-modal {
+  .ui-modal.verify-modal {
     min-width: 90vw;
     max-width: 90vw;
   }
 }
+
+/* .verify-modal .modal-content eliminado: huérfano tras migrar a <Modal>
+   (grep "\.modal-content" en src/**/*.jsx → sin usos en este componente). */

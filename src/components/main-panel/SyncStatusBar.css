@@ -4,17 +4,18 @@
   display: grid;
   grid-template-columns: minmax(180px, 320px) 1fr 48px;
   align-items: center;
-  gap: 14px;
-  margin: 0 24px 14px;
-  padding: 12px 14px;
+  gap: var(--gap-md);
+  margin: 0 var(--gap-lg) var(--gap-md);
+  padding: var(--gap-md);
   background: var(--bg-elevated);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-md);
-  font-size: 12px;
+  font-size: var(--fs-sm);
+  transition: border-color var(--transition);
 }
-.ecosystem-sync > div:first-child { display: grid; gap: 3px; }
+.ecosystem-sync > div:first-child { display: grid; gap: var(--gap-xs); }
 .ecosystem-sync > div:first-child span { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ecosystem-sync-track { height: 6px; border-radius: 99px; background: var(--bg-base); overflow: hidden; }
-.ecosystem-sync-track > div { height: 100%; background: var(--accent); transition: width .2s ease; }
+.ecosystem-sync-track > div { height: 100%; background: var(--accent); transition: width var(--transition); }
 .ecosystem-sync.error { border-color: var(--red); }
 .ecosystem-sync.error .ecosystem-sync-track > div { background: var(--red); }

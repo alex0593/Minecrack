@@ -9,6 +9,7 @@ import ModDetail from './mod-browser-modal/ModDetail';
 import FilterBar from './mod-browser-modal/FilterBar';
 import ModResultsList from './mod-browser-modal/ModResultsList';
 import VanillaGuard from './mod-browser-modal/VanillaGuard';
+import Modal from './ui/Modal';
 import './ModBrowserModal.css';
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
@@ -127,60 +128,58 @@ function ModBrowserContent({ instanceId, onClose }) {
     return () => clearTimeout(debounceRef.current);
   }, [query, filterVersion, filterLoader, filterSource, filterType]);
 
-  const loadMore = () => doSearch(query, filterVersion, filterLoader, filterType, offset + LIMIT);
+  // Hallazgo 7: antes pasaba `filterType` como `source` y el offset como `type`
+  const loadMore = () => doSearch(query, filterVersion, filterLoader, filterSource, filterType, offset + LIMIT);
 
   return (
-    <div className="modbrowser-overlay" onClick={onClose}>
-      <div className="modbrowser-modal modal modal--xl" onClick={e => e.stopPropagation()}>
+    <Modal
+      open
+      onClose={onClose}
+      title={filterType === 'mods' ? 'Explorar Mods' : 'Explorar Modpacks'}
+      icon="🔍"
+      size="xl"
+      contentClassName="modbrowser-modal"
+    >
+      {/* Filtros */}
+      <FilterBar
+        query={query}
+        onQueryChange={setQuery}
+        filterType={filterType}
+        onFilterTypeChange={setFilterType}
+        filterSource={filterSource}
+        onFilterSourceChange={setFilterSource}
+        filterVersion={filterVersion}
+        onFilterVersionChange={setFilterVersion}
+        filterLoader={filterLoader}
+        onFilterLoaderChange={setFilterLoader}
+      />
 
-        {/* Header */}
-        <div className="modbrowser-header">
-          <h2>🔍 {filterType === 'mods' ? 'Explorar Mods' : 'Explorar Modpacks'}</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
+      {/* Cuerpo */}
+      <div className="modbrowser-body">
 
-        {/* Filtros */}
-        <FilterBar
-          query={query}
-          onQueryChange={setQuery}
-          filterType={filterType}
-          onFilterTypeChange={setFilterType}
-          filterSource={filterSource}
-          onFilterSourceChange={setFilterSource}
-          filterVersion={filterVersion}
-          onFilterVersionChange={setFilterVersion}
-          filterLoader={filterLoader}
-          onFilterLoaderChange={setFilterLoader}
+        {/* Lista */}
+        <ModResultsList
+          loading={loading}
+          error={error}
+          results={results}
+          total={total}
+          selected={selected}
+          onSelect={setSelected}
+          installedIds={installedIds}
+          onLoadMore={loadMore}
         />
 
-        {/* Cuerpo */}
-        <div className="modbrowser-body">
-
-          {/* Lista */}
-          <ModResultsList
-            loading={loading}
-            error={error}
-            results={results}
-            total={total}
-            selected={selected}
-            onSelect={setSelected}
-            installedIds={installedIds}
-            onLoadMore={loadMore}
+        {/* Detalle */}
+        <div className="modbrowser-detail-panel">
+          <ModDetail
+            mod={selected}
+            instance={instance}
+            isModpack={filterType === 'modpacks'}
+            filterSource={filterSource}
+            onInstalled={() => setSelected(null)}
           />
-
-          {/* Detalle */}
-          <div className="modbrowser-detail-panel">
-            <ModDetail
-              mod={selected}
-              instance={instance}
-              isModpack={filterType === 'modpacks'}
-              filterSource={filterSource}
-              onInstalled={() => setSelected(null)}
-            />
-          </div>
         </div>
-
       </div>
-    </div>
+    </Modal>
   );
 }

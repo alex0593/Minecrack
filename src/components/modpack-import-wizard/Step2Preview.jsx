@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getModpackWithVersions as getCFModpackWithVersions } from '../../lib/api/curseforge-modpacks';
+import Skeleton from '../ui/Skeleton';
 import './Step2Preview.css';
 
 export default function Step2Preview({ source, pack, gameVersion, onNext, onBack }) {
@@ -59,7 +60,14 @@ export default function Step2Preview({ source, pack, gameVersion, onNext, onBack
     <div className="wizard-step-preview compact">
       <h2>Vista previa del modpack</h2>
 
-      {loading && <div className="wizard-loading">Cargando versiones...</div>}
+      {loading && (
+        <div className="wizard-preview-skeleton" role="status" aria-live="polite">
+          <span className="wizard-sr-only">Cargando versiones...</span>
+          <Skeleton lines={1} height={72} radius={10} />
+          <Skeleton lines={3} />
+          <Skeleton lines={1} height={40} radius={8} />
+        </div>
+      )}
 
       {!loading && (
         <>

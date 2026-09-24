@@ -17,52 +17,23 @@ import InstanceSettingsModal from './components/InstanceSettingsModal';
 import VerifyInstanceModal   from './components/VerifyInstanceModal';
 import SetupWizard           from './components/SetupWizard';
 import { ToastViewport }     from './components/ui/Toast';
+import ErrorModal            from './components/ui/ErrorModal';
 
-function ErrorModal() {
+// Migración del modal de error inline al componente compartido ui/ErrorModal.
+// Mismo flujo que antes: se muestra mientras `state.errorMessage` exista y se
+// cierra despachando CLEAR_ERROR (ahora también con Esc / × / overlay, que es
+// el comportamiento del shell Modal compartido).
+function AppErrorModal() {
   const { state, dispatch } = useStore();
   const { errorMessage } = state;
   if (!errorMessage) return null;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
-    }}>
-      <div style={{
-        background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)', padding: 28, maxWidth: 520, width: '90%',
-        boxShadow: 'var(--shadow-md)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <span style={{ fontSize: 22 }}>❌</span>
-          <h2 style={{ margin: 0, color: 'var(--red)' }}>Error al lanzar el juego</h2>
-        </div>
-        <pre style={{
-          background: 'var(--bg-base)', color: 'var(--text-secondary)',
-          border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-          padding: '12px 14px', fontSize: 12, fontFamily: 'var(--font-mono)',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-          userSelect: 'text', cursor: 'text',
-          maxHeight: 240, overflowY: 'auto', margin: '0 0 20px',
-        }}>
-          {errorMessage}
-        </pre>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => navigator.clipboard.writeText(errorMessage)}
-          >
-            📋 Copiar error
-          </button>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => dispatch({ type: 'CLEAR_ERROR' })}
-          >
-            Cerrar
-          </button>
-        </div>
-      </div>
-    </div>
+    <ErrorModal
+      message={errorMessage}
+      onClose={() => dispatch({ type: 'CLEAR_ERROR' })}
+      open
+    />
   );
 }
 
@@ -220,7 +191,7 @@ function AppShell() {
       <Sidebar />
       <MainPanel />
       <Modals />
-      <ErrorModal />
+      <AppErrorModal />
       <JavaDownloadOverlay />
     </div>
   );

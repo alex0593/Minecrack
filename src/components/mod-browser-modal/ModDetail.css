@@ -4,9 +4,9 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: 12px;
+  gap: var(--gap-md);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 
 .modbrowser-detail-header {
@@ -27,23 +27,23 @@
 .modbrowser-detail h2 { font-size: 16px; margin: 0 0 4px; }
 
 .modbrowser-detail-by {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin-bottom: 6px;
 }
 
 .modbrowser-detail-stats {
   display: flex;
-  gap: 12px;
-  font-size: 11px;
+  gap: var(--gap-md);
+  font-size: var(--fs-xs);
   color: var(--text-secondary);
 }
 
 .modbrowser-detail-desc {
-  font-size: 13px;
+  font-size: var(--fs-md);
   color: var(--text-secondary);
   line-height: 1.6;
-  margin-bottom: 16px;
+  margin-bottom: var(--gap-md);
 }
 
 .modbrowser-detail-section {
@@ -52,7 +52,7 @@
 
 .modbrowser-detail-section label {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -61,12 +61,12 @@
 }
 
 .modbrowser-no-versions {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--amber);
-  background: rgba(255,183,77,0.08);
-  border: 1px solid rgba(255,183,77,0.2);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 20%, transparent);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: var(--gap-sm) var(--gap-md);
 }
 
 .modbrowser-detail-file {
@@ -76,8 +76,8 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: var(--gap-sm) var(--gap-md);
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
   margin-bottom: 14px;
 }
@@ -86,38 +86,38 @@
 .modbrowser-compat {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-  font-size: 12px;
+  gap: var(--gap-xs);
+  margin-top: var(--gap-sm);
+  font-size: var(--fs-sm);
 }
 
 .modbrowser-compat-ok {
-  color: #4caf50;
+  color: var(--accent);
   padding: 5px 8px;
-  background: rgba(76, 175, 80, 0.08);
-  border: 1px solid rgba(76, 175, 80, 0.2);
-  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: var(--radius-sm);
 }
 
 .modbrowser-compat-error {
-  color: #ef9a9a;
+  color: var(--red);
   padding: 5px 8px;
-  background: rgba(239, 83, 80, 0.08);
-  border: 1px solid rgba(239, 83, 80, 0.2);
-  border-radius: 5px;
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red) 20%, transparent);
+  border-radius: var(--radius-sm);
 }
 
 .modbrowser-compat-warn {
-  color: #ffcc80;
+  color: var(--amber);
   padding: 5px 8px;
-  background: rgba(255, 183, 77, 0.08);
-  border: 1px solid rgba(255, 183, 77, 0.2);
-  border-radius: 5px;
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 20%, transparent);
+  border-radius: var(--radius-sm);
 }
 
 /* ── Barra de progreso ─────────────────────────────────────── */
 .modbrowser-progress {
-  margin-top: 16px;
+  margin-top: var(--gap-md);
 }
 
 .modbrowser-progress-bar {
@@ -131,11 +131,11 @@
 .modbrowser-progress-fill {
   height: 100%;
   border-radius: 99px;
-  transition: width 0.2s ease;
+  transition: width var(--transition);
 }
 
 .modbrowser-progress-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;

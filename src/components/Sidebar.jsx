@@ -85,7 +85,7 @@ export default function Sidebar() {
       {/* Instance list */}
       <div className="sidebar-instances-header">
         <span className="sidebar-instances-title">Instancias ({instances.length})</span>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 'var(--gap-sm)' }}>
           <button
             id="btn-import-instance-sidebar"
             className="btn btn-ghost btn-xs"

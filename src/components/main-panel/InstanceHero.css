@@ -3,7 +3,7 @@
 .instance-hero {
   position: relative;
   padding: var(--gap-xl);
-  background: linear-gradient(135deg, #0d1a12 0%, #0a0d14 100%);
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-base) 100%);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -42,10 +42,10 @@
 }
 
 .instance-hero-name {
-  font-size: 26px;
+  font-size: var(--fs-2xl);
   font-weight: 800;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin-bottom: var(--gap-sm);
 }
 
 .instance-hero-meta {
@@ -65,35 +65,43 @@
 .btn-play {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 32px;
+  gap: var(--gap-sm);
+  padding: var(--gap-md) var(--gap-xl);
   background: linear-gradient(135deg, var(--accent-dim), var(--accent));
   border: none;
   border-radius: var(--radius-lg);
   color: #000;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 800;
   cursor: pointer;
-  transition: all var(--transition);
+  transition: transform var(--transition), box-shadow var(--transition);
   font-family: var(--font-sans);
-  box-shadow: 0 4px 20px rgba(0, 230, 118, 0.3);
+  box-shadow: 0 4px 20px var(--accent-glow-strong);
   letter-spacing: 0.03em;
   animation: glow 3s ease-in-out infinite;
 }
 
 .btn-play:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 230, 118, 0.5);
+  box-shadow: 0 8px 30px var(--accent-glow-strong);
 }
 
 .btn-play:active { transform: translateY(0); }
 
 .btn-play.running {
-  background: linear-gradient(135deg, #c0392b, #e74c3c);
-  box-shadow: 0 4px 20px rgba(192,57,43,0.4);
+  background: var(--red);
+  box-shadow: 0 4px 20px rgba(239, 83, 80, 0.4);
+  animation: none;
+}
+
+/* Instalación pendiente — se define después de :hover/.running para seguir
+   ganándoles, igual que hacía el style inline que había aquí (Fase 3). */
+.btn-play.install {
+  background: var(--blue);
+  box-shadow: 0 4px 20px rgba(25, 118, 210, 0.3);
   animation: none;
 }
 
 .btn-play-icon {
-  font-size: 20px;
+  font-size: var(--fs-xl);
 }

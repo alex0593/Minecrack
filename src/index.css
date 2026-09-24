@@ -564,159 +564,6 @@ p  { color: var(--text-secondary); }
   white-space: nowrap;
 }
 
-/* ─── Console (game log viewer) ────────────────────────────────────────── */
-.console-wrap {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--bg-base);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  position: relative;
-}
-.console-header {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  padding: 10px 12px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-.console-filters {
-  display: flex;
-  gap: 4px;
-}
-.console-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.console-chip:hover { background: var(--bg-hover); }
-.console-chip.is-active {
-  color: var(--accent);
-  background: var(--accent-glow);
-  border-color: var(--border-accent);
-}
-.console-chip.is-active.chip-warn  { color: var(--amber); background: rgba(255,183,77,0.12); border-color: rgba(255,183,77,0.3); }
-.console-chip.is-active.chip-error { color: var(--red); background: rgba(239,83,80,0.12); border-color: rgba(239,83,80,0.3); }
-.console-chip-count {
-  font-size: 10px;
-  background: var(--bg-base);
-  padding: 1px 5px;
-  border-radius: 999px;
-  color: inherit;
-  opacity: 0.7;
-}
-.console-search {
-  flex: 1;
-  min-width: 140px;
-  padding: 5px 10px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 12px;
-  outline: none;
-  font-family: var(--font-mono);
-}
-.console-search:focus { border-color: var(--border-accent); }
-.console-actions {
-  display: flex;
-  gap: 4px;
-}
-.console-action-btn {
-  padding: 5px 10px;
-  font-size: 11px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition);
-}
-.console-action-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.console-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.55;
-  scroll-behavior: smooth;
-}
-.console-body::-webkit-scrollbar { width: 10px; }
-.console-body::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 5px; }
-.console-body::-webkit-scrollbar-track { background: transparent; }
-
-.console-line {
-  display: grid;
-  grid-template-columns: 70px 50px 1fr;
-  gap: 8px;
-  padding: 1px 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.console-line:hover { background: rgba(255,255,255,0.02); }
-.console-line-time { color: var(--text-muted); user-select: none; }
-.console-line-level {
-  font-weight: 700;
-  font-size: 10px;
-  text-transform: uppercase;
-  padding-top: 1px;
-}
-.console-line-level-info  { color: var(--text-secondary); }
-.console-line-level-warn  { color: var(--amber); }
-.console-line-level-error { color: var(--red); }
-.console-line-msg { color: var(--text-primary); }
-.console-line-msg mark {
-  background: rgba(255, 235, 59, 0.25);
-  color: inherit;
-  border-radius: 2px;
-  padding: 0 2px;
-}
-
-.console-jump-bottom {
-  position: absolute;
-  bottom: 16px;
-  right: 20px;
-  padding: 8px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--accent);
-  color: var(--bg-base);
-  border: none;
-  border-radius: 999px;
-  cursor: pointer;
-  box-shadow: var(--shadow-md);
-  animation: slideUp 0.2s ease;
-  z-index: 10;
-}
-.console-jump-bottom:hover { background: var(--accent-dim); }
-
-.console-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* ─── Hero metadata row ────────────────────────────────────────────────── */
 .hero-meta {
   display: flex;
@@ -1042,4 +889,55 @@ p  { color: var(--text-secondary); }
   :root {
     --sidebar-w: 240px;
   }
+}
+
+/* ===================================================
+   Fase 3 — Renovación visual (globales)
+   =================================================== */
+
+/* --- Selects nativos (hallazgo baseline 3: se renderizaban blancos) ---
+   appearance:none + tokens del tema; el desplegable sigue siendo del SO. */
+select,
+select[class] {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--bg-elevated);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b92a8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 26px 7px 10px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+select:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* --- Focus visible global (Fase 3) ---
+   Al final del fichero: empata en especificidad con los `outline: none`
+   preexistentes (.btn:focus, .input:focus…) y gana por orden. */
+:is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+:is([role="dialog"], [tabindex="-1"]):focus-visible {
+  outline: none;
 }

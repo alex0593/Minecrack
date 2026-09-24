@@ -248,7 +248,7 @@ export default function Step4Install({ source, pack, version, gameVersion, confi
     <div className="wizard-step-install">
       <h2>Instalando {pack.title || pack.name}</h2>
 
-      <ProgressBar percent={progress} />
+      <ProgressBar value={progress} />
 
       <div className="wizard-progress-label">{progressLabel}</div>
 

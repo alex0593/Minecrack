@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useStore } from '../../store';
 import { formatLogTime } from '../../lib/format';
+import './ConsoleTab.css';
 
 /** ConsoleTab — consola de logs del juego con filtros, búsqueda y auto-scroll */
 export default function ConsoleTab() {

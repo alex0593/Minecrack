@@ -2,8 +2,8 @@
 /* ── Filtros ───────────────────────────────────────────────── */
 .modbrowser-filters {
   display: flex;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: var(--gap-sm);
+  padding: var(--gap-sm) var(--gap-md);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -31,15 +31,5 @@
   font-size: 13px;
   outline: none;
 }
-
-.modbrowser-select {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  padding: 7px 10px;
-  font-size: 13px;
-  outline: none;
-  cursor: pointer;
-  min-width: 130px;
-}
+/* .modbrowser-select eliminado: huérfano (grep "modbrowser-select" en
+   src/**/*.jsx → sin usos; el filtro de loader ya usa <ui/Select>). */

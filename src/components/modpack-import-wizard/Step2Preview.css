@@ -76,6 +76,24 @@
   cursor: pointer;
 }
 
+/* Métricas del select de versión (solo ancho/altura, colores vía tokens) */
+.wizard-step-preview .wizard-version-selector select {
+  width: 100%;
+  max-width: 460px;
+  height: 44px;
+  padding: 0 30px 0 12px;
+  font-size: 14px;
+  border-radius: var(--radius-md);
+}
+
+/* Skeleton de carga de versiones */
+.wizard-preview-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+  min-height: 240px;
+}
+
 /* ─── Compact Mode (Preview Step) ──────────────────────────────────────────── */
 .wizard-step-preview.compact {
   max-height: 500px;
@@ -137,9 +155,12 @@
   font-weight: 500;
 }
 
+/* Compact mode: selector de versión más apretado (métricas, mismos tokens) */
 .wizard-step-preview.compact .wizard-version-selector select {
-  padding: var(--gap-sm) var(--gap-md);
+  height: 38px;
+  padding: 0 28px 0 10px;
   font-size: 13px;
+  max-width: 100%;
 }
 
 .wizard-step-preview.compact .wizard-button-group {

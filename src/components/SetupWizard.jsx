@@ -108,7 +108,12 @@ export default function SetupWizard() {
         <div className="setup-wizard-header">
           <div className="setup-wizard-progress-indicators">
             {STEPS.map((s) => (
-              <div key={s.num} className="setup-wizard-step-indicator">
+              <div
+                key={s.num}
+                className={`setup-wizard-step-indicator ${
+                  s.num === currentStepNum ? 'active' : ''
+                } ${s.num < currentStepNum ? 'completed' : ''}`}
+              >
                 <div
                   className={`setup-wizard-step-dot ${
                     s.num === currentStepNum ? 'active' : ''

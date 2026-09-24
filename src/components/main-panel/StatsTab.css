@@ -15,17 +15,45 @@
 }
 
 .stat-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
-  margin-bottom: 6px;
+  margin-bottom: var(--gap-sm);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .stat-value {
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .stat-value.accent { color: var(--accent); }
+
+/* ─── Reparación del loader (antes inline styles mágicos) ─────────────── */
+.repair-panel {
+  margin-top: var(--gap-lg);
+  padding: var(--gap-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.repair-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  margin-bottom: var(--gap-sm);
+}
+
+.repair-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--gap-md);
+}
+
+.repair-status {
+  margin-top: var(--gap-sm);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.repair-skeleton { margin-top: var(--gap-sm); }

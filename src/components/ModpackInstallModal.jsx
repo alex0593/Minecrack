@@ -29,6 +29,7 @@ import {
 } from '../lib/tauri';
 import { downloadMultipleModsFromCurseForge } from '../lib/mods/curseforge-downloader';
 import ProgressBar from './ui/ProgressBar';
+import Modal from './ui/Modal';
 import './ModpackDownloadModal.css';
 
 export default function ModpackInstallModal({ source, pack, onClose }) {
@@ -186,133 +187,132 @@ export default function ModpackInstallModal({ source, pack, onClose }) {
 
   if (step === 'error') {
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content modpack-download-modal" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>❌ Error</h2>
-            <button className="modal-close" onClick={onClose}>✕</button>
-          </div>
-          <div className="modal-body">
-            <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--red)', fontSize: 12 }}>{error}</pre>
-          </div>
-          <div className="modal-footer">
-            <button className="btn btn-primary" onClick={onClose}>Cerrar</button>
-          </div>
-        </div>
-      </div>
+      <Modal
+        open
+        onClose={onClose}
+        title="Error"
+        icon="❌"
+        contentClassName="modpack-download-modal"
+        footer={<button className="btn btn-primary" onClick={onClose}>Cerrar</button>}
+      >
+        <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--red)', fontSize: 12 }}>{error}</pre>
+      </Modal>
     );
   }
 
   if (step === 'loading') {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content modpack-download-modal" onClick={e => e.stopPropagation()}>
-          <div className="modal-body" style={{ textAlign: 'center', padding: 40 }}>
-            <div className="import-spinner" style={{ margin: '0 auto 16px' }} />
-            <p>Cargando información del modpack…</p>
-          </div>
+      <Modal
+        open
+        onClose={onClose}
+        showClose={false}
+        closeOnOverlay={false}
+        contentClassName="modpack-download-modal"
+      >
+        <div style={{ textAlign: 'center', padding: 'var(--gap-md)' }}>
+          <div className="import-spinner" style={{ margin: '0 auto 16px' }} />
+          <p>Cargando información del modpack…</p>
         </div>
-      </div>
+      </Modal>
     );
   }
 
   if (step === 'downloading' || step === 'installing-mods' || step === 'done') {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content modpack-download-modal" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>{step === 'done' ? '✓ Instalado' : '📥 Instalando modpack'}</h2>
-          </div>
-          <div className="modal-body" style={{ paddingTop: 24 }}>
-            {step === 'done' ? (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 12 }}>✓</div>
-                <p style={{ fontSize: 14, margin: 0 }}>{display.name}</p>
-                {modsDone > 0 && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8, margin: 0 }}>
-                    {modsDone} mod{modsDone === 1 ? '' : 's'} descargado{modsDone === 1 ? '' : 's'}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <>
-                <ProgressBar value={progress} max={100} label={`${Math.round(progress)}%`} animated style={{ marginBottom: 16 }} />
-                <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>{progressLabel}</p>
-                {step === 'installing-mods' && modsTotal > 0 && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 8 }}>
-                    {modsDone}/{modsTotal}
-                    {modsFailed > 0 && <span style={{ color: 'var(--red)' }}> ({modsFailed} fallidos)</span>}
-                  </p>
-                )}
-              </>
+      <Modal
+        open
+        onClose={onClose}
+        title={step === 'done' ? 'Instalado' : 'Instalando modpack'}
+        icon={step === 'done' ? '✓' : '📥'}
+        showClose={false}
+        closeOnOverlay={false}
+        contentClassName="modpack-download-modal"
+      >
+        {step === 'done' ? (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 12 }}>✓</div>
+            <p style={{ fontSize: 14, margin: 0 }}>{display.name}</p>
+            {modsDone > 0 && (
+              <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8, margin: 0 }}>
+                {modsDone} mod{modsDone === 1 ? '' : 's'} descargado{modsDone === 1 ? '' : 's'}
+              </p>
             )}
           </div>
-        </div>
-      </div>
+        ) : (
+          <>
+            <ProgressBar value={progress} max={100} label={`${Math.round(progress)}%`} animated style={{ marginBottom: 16 }} />
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>{progressLabel}</p>
+            {step === 'installing-mods' && modsTotal > 0 && (
+              <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 8 }}>
+                {modsDone}/{modsTotal}
+                {modsFailed > 0 && <span style={{ color: 'var(--red)' }}> ({modsFailed} fallidos)</span>}
+              </p>
+            )}
+          </>
+        )}
+      </Modal>
     );
   }
 
-  // step === 'previewing'
+  // step === 'previewing' (overlay y × cerraban: closeOnOverlay por defecto)
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content modpack-download-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>📦 {display.name}</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="modal-body">
-          {display.logo && (
-            <div style={{ marginBottom: 16, textAlign: 'center' }}>
-              <img src={display.logo} alt={display.name} style={{ maxHeight: 120, borderRadius: 4 }} />
-            </div>
-          )}
-
-          <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-            por <strong>{display.author}</strong> · ⬇ {display.downloads?.toLocaleString() || '?'}
-          </div>
-
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>{display.summary}</p>
-
-          {source === 'curseforge' && !isCurseForgeConfigured() && (
-            <div style={{ background: 'var(--bg-warning)', border: '1px solid var(--text-warning)', padding: 10, borderRadius: 4, marginTop: 12, fontSize: 12, color: 'var(--text-warning)' }}>
-              ⚠️ CurseForge API no está configurada (.env)
-            </div>
-          )}
-
-          {source === 'modrinth' && (
-            <div style={{ background: 'var(--bg-elevated)', padding: 10, borderRadius: 4, marginTop: 12, fontSize: 11, color: 'var(--text-muted)' }}>
-              ℹ️ Modrinth: por ahora se crea una instancia preconfigurada con MC + loader.
-              La importación nativa de .mrpack está en desarrollo.
-            </div>
-          )}
-
-          <div style={{ marginTop: 16 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Versión</label>
-            <select
-              className="input"
-              value={selectedVersion?.id || ''}
-              onChange={e => setSelectedVersion(versions.find(v => v.id === e.target.value))}
-              style={{ width: '100%' }}
-            >
-              {versions.map(v => (
-                <option key={v.id} value={v.id}>
-                  {source === 'curseforge'
-                    ? `${v.displayName || v.fileName} (${v.gameVersions?.join(', ') || '?'})`
-                    : `${v.name} (${v.game_versions?.[0] || '?'} · ${v.loaders?.join('/') || '?'})`}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="modal-footer">
+    <Modal
+      open
+      onClose={onClose}
+      title={display.name}
+      icon="📦"
+      contentClassName="modpack-download-modal"
+      footer={
+        <>
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" onClick={handleInstall} disabled={!selectedVersion}>
             {source === 'curseforge' ? '📥 Descargar e instalar' : '⬇ Crear instancia'}
           </button>
+        </>
+      }
+    >
+      {display.logo && (
+        <div style={{ marginBottom: 16, textAlign: 'center' }}>
+          <img src={display.logo} alt={display.name} style={{ maxHeight: 120, borderRadius: 4 }} />
         </div>
+      )}
+
+      <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+        por <strong>{display.author}</strong> · ⬇ {display.downloads?.toLocaleString() || '?'}
       </div>
-    </div>
+
+      <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>{display.summary}</p>
+
+      {source === 'curseforge' && !isCurseForgeConfigured() && (
+        <div style={{ background: 'var(--bg-warning)', border: '1px solid var(--text-warning)', padding: 10, borderRadius: 4, marginTop: 12, fontSize: 12, color: 'var(--text-warning)' }}>
+          ⚠️ CurseForge API no está configurada (.env)
+        </div>
+      )}
+
+      {source === 'modrinth' && (
+        <div style={{ background: 'var(--bg-elevated)', padding: 10, borderRadius: 4, marginTop: 12, fontSize: 11, color: 'var(--text-muted)' }}>
+          ℹ️ Modrinth: por ahora se crea una instancia preconfigurada con MC + loader.
+          La importación nativa de .mrpack está en desarrollo.
+        </div>
+      )}
+
+      <div style={{ marginTop: 16 }}>
+        <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Versión</label>
+        <select
+          className="input"
+          value={selectedVersion?.id || ''}
+          onChange={e => setSelectedVersion(versions.find(v => v.id === e.target.value))}
+          style={{ width: '100%' }}
+        >
+          {versions.map(v => (
+            <option key={v.id} value={v.id}>
+              {source === 'curseforge'
+                ? `${v.displayName || v.fileName} (${v.gameVersions?.join(', ') || '?'})`
+                : `${v.name} (${v.game_versions?.[0] || '?'} · ${v.loaders?.join('/') || '?'})`}
+            </option>
+          ))}
+        </select>
+      </div>
+    </Modal>
   );
 }

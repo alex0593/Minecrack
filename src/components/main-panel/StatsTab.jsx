@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './StatsTab.css';
+import Skeleton from '../ui/Skeleton';
 import { useStore } from '../../store';
 import { LOADERS } from '../../lib/instances';
 import { formatPlaytime } from '../../lib/format';
@@ -85,11 +86,11 @@ export default function StatsTab({ instance }) {
       </div>
 
       {canReinstallLoader && (
-        <div style={{ marginTop: 24, padding: 16, border: '1px solid var(--border)', borderRadius: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+        <div className="repair-panel">
+          <div className="repair-title">
             🔧 Reparación del loader
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+          <div className="repair-desc">
             Si tienes errores como <code>ClassNotFoundException</code> al lanzar,
             re-instala el loader para descargar archivos faltantes.
           </div>
@@ -101,8 +102,14 @@ export default function StatsTab({ instance }) {
             {repairing ? '⏳ Reparando…' : `🔄 Reinstalar ${instance.loader}`}
           </button>
           {repairStatus && (
-            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+            <div className="repair-status">
               {repairStatus}
+            </div>
+          )}
+          {repairing && (
+            <div className="repair-skeleton" role="status" aria-live="polite">
+              <span className="panel-sr-only">Reparando {instance.loader}...</span>
+              <Skeleton lines={1} height={8} radius={99} />
             </div>
           )}
         </div>

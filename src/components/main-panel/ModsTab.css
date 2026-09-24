@@ -2,22 +2,22 @@
 
 /* Descripción expandida de un mod */
 .mod-description-panel {
-  padding: 8px 12px;
-  margin: 0 0 4px;
-  font-size: 12px;
+  padding: var(--gap-sm) var(--gap-md);
+  margin: 0 0 var(--gap-xs);
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   background: var(--bg-elevated);
   border-left: 3px solid var(--accent);
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   line-height: 1.5;
 }
 
 .mod-description-empty { color: var(--text-muted); font-style: italic; }
 
 .mod-expanded-desc {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
-  margin-top: 6px;
+  margin-top: var(--gap-sm);
   line-height: 1.5;
   white-space: pre-wrap;
 }
@@ -37,12 +37,16 @@
   display: flex;
   align-items: flex-start;
   gap: var(--gap-md);
-  transition: all var(--transition);
+  transition:
+    transform var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 .mod-card:hover {
-  border-color: rgba(255,255,255,0.12);
+  border-color: var(--text-muted);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .mod-card.disabled { opacity: 0.5; }
@@ -56,13 +60,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   flex-shrink: 0;
 }
 
 .mod-info { flex: 1; min-width: 0; }
-.mod-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.mod-actions { display: flex; gap: 6px; margin-top: 8px; }
+.mod-name { font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); }
+.mod-actions { display: flex; gap: var(--gap-sm); margin-top: var(--gap-sm); }
 
 /* Icono de mod como imagen */
 .mod-icon-img {
@@ -87,20 +91,21 @@
 /* Barra de búsqueda de mods */
 .mods-search-bar {
   position: relative;
-  margin: 8px 0 6px;
+  margin: var(--gap-sm) 0;
 }
 
 .mods-search-input {
   width: 100%;
-  padding: 7px 36px 7px 12px;
+  /* El padding derecho de 36px deja hueco al botón ✕ de limpiar */
+  padding: var(--gap-sm) 36px var(--gap-sm) var(--gap-md);
   background: var(--bg-base);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--fs-md);
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.15s;
+  transition: border-color var(--transition);
 }
 
 .mods-search-input:focus {
@@ -113,17 +118,18 @@
 
 .mods-search-clear {
   position: absolute;
-  right: 8px;
+  right: var(--gap-sm);
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
-  padding: 2px 4px;
-  border-radius: 3px;
+  font-size: var(--fs-sm);
+  padding: var(--gap-xs);
+  border-radius: var(--radius-sm);
   line-height: 1;
+  transition: color var(--transition), background-color var(--transition);
 }
 
 .mods-search-clear:hover {
@@ -146,12 +152,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: var(--fs-md);
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--transition);
+  transition: color var(--transition), background-color var(--transition);
   font-family: var(--font-sans);
 }
 
@@ -167,14 +173,14 @@
 .mod-row-compact {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
+  gap: var(--gap-sm);
+  padding: var(--gap-sm);
   border-radius: var(--radius-sm);
-  font-size: 12px;
-  transition: background var(--transition);
+  font-size: var(--fs-sm);
+  transition: background-color var(--transition);
 }
 
-.mod-row-compact:hover { background: var(--bg-surface); }
+.mod-row-compact:hover { background-color: var(--bg-surface); }
 .mod-row-compact.disabled { opacity: 0.45; }
 
 .mod-compact-dot {
@@ -188,20 +194,43 @@
 .mod-compact-dot.off { background: var(--text-muted); }
 
 .mod-compact-name { flex: 1; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mod-compact-actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity var(--transition); }
+.mod-compact-actions { display: flex; gap: var(--gap-xs); flex-shrink: 0; opacity: 0; transition: opacity var(--transition); }
 .mod-row-compact:hover .mod-compact-actions { opacity: 1; }
+
+/* ─── Header auxiliares (antes inline styles) ─────────────────────────── */
+.mods-count {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.mods-header-actions {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+}
+
+/* ─── Actividad de exportación (Skeleton) ─────────────────────────────── */
+.mods-busy {
+  margin-bottom: var(--gap-sm);
+}
+
+/* ─── Empty state de búsqueda sin resultados (variante compacta) ─────── */
+.mods-empty--compact { padding: var(--gap-lg) 0; }
+.mods-empty--compact .empty-state-illustration { font-size: 32px; }
+.mods-empty--compact .empty-state-title { font-size: var(--fs-lg); }
+.mods-empty--compact .btn { margin-top: var(--gap-sm); }
 
 /* ─── Export notification ───────────────────────────────────── */
 .export-notification {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: var(--gap-lg);
+  right: var(--gap-lg);
   max-width: 350px;
-  padding: 14px 16px;
+  padding: var(--gap-md);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
   z-index: 1000;
   animation: slideInUp 0.3s ease;
 }
@@ -220,11 +249,11 @@
 .export-notification-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--gap-md);
 }
 
 .export-notification-icon {
-  font-size: 20px;
+  font-size: var(--fs-xl);
   color: var(--accent);
   flex-shrink: 0;
   font-weight: bold;
@@ -234,16 +263,16 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--gap-xs);
 }
 
 .export-notification-title {
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .export-notification-details {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }

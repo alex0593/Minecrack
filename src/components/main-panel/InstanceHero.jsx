@@ -94,11 +94,6 @@ export default function InstanceHero({
           <button
             id="btn-play-instance"
             className={`btn-play${isThisRunning ? ' running' : ''}${!instance.installed ? ' install' : ''}`}
-            style={!instance.installed ? {
-              background: 'linear-gradient(135deg, #1565c0, #1976d2)',
-              boxShadow: '0 4px 20px rgba(25,118,210,0.3)',
-              animation: 'none',
-            } : {}}
             onClick={onPlay}
             disabled={syncing}
           >

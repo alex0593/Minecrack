@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './ModsTab.css';
+import Skeleton from '../ui/Skeleton';
 import { useStore } from '../../store';
 import {
   listMods, deleteMod, toggleMod, getLauncherDir, exportInstanceMods, ensureDir,
@@ -108,11 +109,11 @@ export default function ModsTab({ instance }) {
         <h3>
           Mods instalados
           {' '}
-          <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
+          <span className="mods-count">
             ({q ? `${filteredMods.length}/${mods.length}` : mods.length})
           </span>
         </h3>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="mods-header-actions">
           {/* View mode toggle */}
           <div className="mods-view-toggle">
             <button
@@ -160,6 +161,14 @@ export default function ModsTab({ instance }) {
           </button>
         </div>
       </div>
+
+      {/* Actividad de exportación (solo visual — el texto sigue en el botón) */}
+      {exporting && (
+        <div className="mods-busy" role="status" aria-live="polite">
+          <span className="panel-sr-only">Exportando mods...</span>
+          <Skeleton lines={1} height={6} radius={99} />
+        </div>
+      )}
 
       {showImportModal && (
         <ImportModsModal
@@ -235,10 +244,10 @@ export default function ModsTab({ instance }) {
           </div>
         </div>
       ) : filteredMods.length === 0 ? (
-        <div className="empty-state" style={{ padding: '24px 0' }}>
-          <div className="empty-state-illustration" style={{ fontSize: 32 }}>🔍</div>
-          <h3 className="empty-state-title" style={{ fontSize: 15 }}>Sin resultados para "{searchQuery}"</h3>
-          <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => setSearchQuery('')}>
+        <div className="empty-state mods-empty--compact">
+          <div className="empty-state-illustration">🔍</div>
+          <h3 className="empty-state-title">Sin resultados para "{searchQuery}"</h3>
+          <button className="btn btn-ghost btn-sm" onClick={() => setSearchQuery('')}>
             Limpiar búsqueda
           </button>
         </div>

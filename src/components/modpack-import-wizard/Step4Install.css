@@ -15,22 +15,42 @@
   color: var(--text-primary);
 }
 
+/* Progreso legible: barra centrada y con ancho estable */
+.wizard-step-install .progress-bar-container {
+  width: 100%;
+  max-width: 480px;
+}
+
 .wizard-progress-label {
   color: var(--text-secondary);
   font-size: 14px;
   text-align: center;
   margin-top: var(--gap-md);
+  min-height: 20px; /* evita saltos de layout entre estados */
 }
 
+/* Estado: instalando */
 .wizard-installing {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   text-align: center;
   margin-top: var(--gap-lg);
+  animation: wizard-install-pulse 1.6s ease-in-out infinite;
 }
 
+@keyframes wizard-install-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Estado: error */
+.wizard-step-install .wizard-error {
+  max-width: 480px;
+}
+
+/* Estado: completado */
 .wizard-success {
-  background: rgba(0, 230, 118, 0.1);
-  border: 1px solid rgba(0, 230, 118, 0.3);
+  background: var(--accent-glow);
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius-md);
   padding: var(--gap-lg);
   text-align: center;
@@ -40,5 +60,6 @@
   gap: var(--gap-md);
   align-items: center;
   margin-top: var(--gap-lg);
+  max-width: 480px;
 }
 

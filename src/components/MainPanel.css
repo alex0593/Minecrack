@@ -54,7 +54,7 @@
   margin-bottom: var(--gap-md);
 }
 
-.mod-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.mod-desc { font-size: var(--fs-xs); color: var(--text-muted); margin-top: var(--gap-xs); }
 
 /* Console */
 .console-box {
@@ -79,21 +79,29 @@
 .mods-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--gap-xs);
+}
+
+/* Placeholder de carga de PacksTab — reserva filas del mismo alto que .mod-row */
+.packs-loading {
+  margin-top: var(--gap-md);
 }
 
 .mod-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: var(--gap-md);
+  padding: var(--gap-sm) var(--gap-md);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  transition: all var(--transition);
+  transition: background-color var(--transition), border-color var(--transition);
 }
 
-.mod-row:hover { border-color: rgba(255,255,255,0.12); }
+.mod-row:hover {
+  border-color: var(--text-muted);
+  background-color: var(--bg-hover);
+}
 .mod-row.disabled { opacity: 0.5; }
 
 .mod-row-icon {
@@ -105,13 +113,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: var(--fs-xl);
   flex-shrink: 0;
 }
 
-.mod-row-info { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
-.mod-row-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mod-row-version { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
-.mod-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.mod-row-info { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--gap-sm); }
+.mod-row-name { font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mod-row-version { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
+.mod-row-actions { display: flex; gap: var(--gap-sm); flex-shrink: 0; }
 
-.mod-compact-version { font-size: 11px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+.mod-compact-version { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+
+/* Texto solo para lectores de pantalla (Skeleton de carga) */
+.panel-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -6,10 +6,14 @@ las Fases 1–3.
 
 ## Capturas
 
-Las imágenes no se versionan (binarios); viven en `/tmp/opencode/ui-baseline/`:
+Las imágenes no se versionan (binarios); viven en `/tmp/opencode/ui-baseline/` (regeneradas el
+2026-09-24 en el Xvfb aislado `:99`) con copia durable en `~/.ui-captures/before-phase3/` —
+`/tmp` se borra en cada reinicio del servidor. El set «después» (Fase 3) está en
+`/tmp/opencode/ui-after/` con copia en `~/.ui-captures/after-phase3/`.
 
 | Archivo | Superficie capturada |
 |---|---|
+| `00-launch.png` | Arranque: vista de bienvenida (pickaxe, CTA «Crear primera instancia»/«Explorar mods») con el sidebar |
 | `03-instance-detail.png` | Detalle de instancia: hero (icono, badges MC/loader/mods, botón Jugar), fila de stats, tabs Mods/Recursos/Shaders/Stats/Consola, empty state de mods |
 | `04-settings.png` | Configuración: Perfil/usuario offline, Java (ruta + "Detectar automáticamente"), Directorio del launcher |
 | `05-modpack-browser.png` | Modal *Explorador de Modpacks*: tabs Modrinth/CurseForge, filtros, cards, "Cargar más modpacks" |
@@ -28,22 +32,25 @@ la app 1200×760).
    dejaron de responder (retraso de cola de varios segundos; solo un reinicio de la app
    lo resolvió). Sospecha: polling/render de logs o del modal en bucle. Merece
    reproducirse y un `fix:` propio antes o durante la Fase 3.
-   - **Estado (2026-09-23)**: auditoría estática completada (timers, listeners,
-     `useEffect` de los hooks y del store: sin bucles; logs capados a 500). Se corrigió
-     una violación de *rules of hooks* en `ModBrowserModal` (guard de vanilla como
-     early-return antes de 13 hooks → `fix: keep mod browser hook count stable across
-     loaders`), que era clase de crash pero **no explica por sí sola** el bucle de CPU:
-     la causa raíz queda **sin confirmar**; vigilar durante la verificación de la Fase 3
-     y, si reaparece, reproducir con devtools abiertos.
+   - **Estado (2026-09-24)**: la auditoría estática de 2026-09-23 no halló bucles y la
+     verificación de la Fase 3 (8 superficies, modales, consola) **no reprodujo** la
+     mudez de la UI; la causa raíz sigue **sin confirmar** — si reaparece, reproducir
+     con devtools y `ps` de `WebKitWebProcess`.
 2. **Cierre inconsistente de modales**:
    - *Nueva instancia*: `×` no cerró; `Esc` solo funcionó cuando el foco **no** estaba en
      un input (el modal autofocusa "Nombre", así que parece roto); `Cancelar` siempre cerró.
    - *Explorar Mods* (error vanilla): `Esc` no cierra; solo el botón `Cerrar`.
    - *Explorador de Modpacks*: cerró con `Esc`.
    - Unificar: handler global de `Esc`, y que `×` y el overlay cierren siempre.
+   - **Estado (Fases 1+3)**: `<Modal>` unifica Esc/×/overlay y en la Fase 3 se migraron
+     los 3 modales citados (más Export/ImportMods/ModsPreview/Verify/ModpackInstall/
+     ModpackDownload); queda **pendiente de QA manual** la prueba explícita de `Esc`
+     en cada uno (la capturación solo validó `×`/`Cerrar` por clic).
 3. **Select blanco sobre modal oscuro** — el filtro de orden del *Explorador de Modpacks*
    se renderiza con fondo blanco (¿`<select>` nativo o `Select` sin tema oscuro?); rompe
    la coherencia del tema.
+   - **Estado (Fase 3): corregido** — los `<select>` nativos reciben tema oscuro en
+     `src/index.css`; verificado en `05-modpack-browser` y `06-new-instance` («después»).
 4. **Lag de repintado** — la primera activación de la tab Consola tardó >1,4 s en
    reflejarse; con la app bajo carga, las capturas tomadas antes de ~3–5 s mostraban el
    estado anterior.
@@ -65,20 +72,50 @@ la app 1200×760).
    acción dedicada `CLEAR_GAME_LOGS` (test: `src/test/console-clear.test.jsx`).
 7. **«Cargar más» del navegador de mods desalineado** — `loadMore` pasa `filterType` en
    el hueco `source` de `doSearch(q, version, loader, source, type, off)`, así que
-   repite la búsqueda con los offsets en el lugar equivocado. Pendiente de `fix:`
-   (candidato a Fase 3).
+   repite la búsqueda con los offsets en el lugar equivocado.
+   - **Estado (Fase 3): corregido** — argumentos alineados en el plan de fases 3.
 8. **Clases de shell de modal sin reglas CSS** — `modal-overlay`, `modal-content`,
    `modal-header`, `modal-body` no existen en ningún CSS de `src/` (solo
    `.ui-modal-overlay` de `ui/Modal.css`); modales como `ModpackDownloadModal`,
-   `ExportInstanceModal` o `ImportModsModal` se pintan sin esos estilos. Lo resuelve
-   naturalmente la migración de modales a `<Modal>` en la Fase 3.
+   `ExportInstanceModal` o `ImportModsModal` se pintan sin esos estilos.
+   - **Estado (Fase 3): corregido** — los 7 modales citados migraron a `<Modal>`,
+     que sí trae su shell CSS.
+
+## Comparación antes/después de la Fase 3 (2026-09-24)
+
+Mismos 8 superficies, mismo entorno (Xvfb `:99`, ventana 1200×760): binario v1.3.2
+(`tauri-app-v132-before-phase3`) a la izquierda, build de la Fase 3 a la derecha.
+% de píxeles casi idénticos (Δ≤7) y diferencia media (0–255):
+
+| Captura | Iguales | Diff media | Comentario |
+|---|---|---|---|
+| `00-launch` | 97,4 % | 1,58 | pulido de tokens en sidebar/bienvenida |
+| `03-instance-detail` | 96,1 % | 2,63 | mismo layout; tipografía y badges afinados |
+| `04-settings` | 98,3 % | 0,89 | casi idéntico (secciones + footer «Guardar cambios») |
+| `05-modpack-browser` | 86,6 % | 13,93 | mayor cambio: `StepsIndicator` nuevo + select oscuro (hallazgo 3) |
+| `06-new-instance` | 94,1 % | 2,51 | barra de progreso + select oscuro |
+| `07-console-tab` | 96,7 % | 1,89 | CSS movido a `ConsoleTab.css` (idéntico byte a byte) |
+| `08-add-mod` | 76,1 % | 4,95 | guard re-pintado con el shell de `<Modal>` (centrado y tokens) |
+| `09-import-instance` | 97,3 % | 1,00 | componente sin migrar: prácticamente idéntico |
+
+Sin cambios de comportamiento: rutas de navegación, modales y acciones responden igual
+(los 8 estados se alcanzaron con la misma secuencia de clics en ambos binarios).
 
 ## Regeneración / automatización (también útil en Fase 5)
 
+- **Display aislado**: capturar siempre en Xvfb `:99` (nunca en el `:0.0` del escritorio
+  real): `apt-get download xvfb && dpkg -x` (sin sudo) → `Xvfb :99 -screen 0 1920x1080x24`,
+  más `xfwm4 --compositor=off`, `xfsettingsd` y la app con
+  `LIBGL_ALWAYS_SOFTWARE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1` (evita el fallo DRI3 que
+  deja frames congelados). Sin screensaver/locker ni colisión con otras ventanas.
 - Clicks X11 con `pyautogui` (venv en `/tmp/opencode/venv-x11`); mapeo de coordenadas
-  verificado exacto contra Xlib (`root.query_pointer`).
+  verificado exacto contra Xlib (`root.query_pointer`). El helper está en
+  `/tmp/opencode/x11.py` (recursivo para `wm_name='Minecrack'`, `raise` con
+  `_NET_ACTIVE_WINDOW` + `set_input_focus`; el **primer clic tras un `raise` puede
+  comerse en el foco** → repetir y verificar).
 - `gnome-screenshot` funciona con fallback X11 sin GNOME Shell.
-- La ventana se localiza por `wm_name='Minecrack'` con búsqueda **recursiva** (xfwm4
-  re-emparenta ventanas) y se trae al frente con `_NET_ACTIVE_WINDOW`.
-- Esperar 3–5 s entre acción y captura (lag de repintado, hallazgo 4) y **verificar
-  siempre** la imagen leída.
+- **El render puede llegar tarde** (hallazgo 4; en Xvfb, decenas de segundos): tras cada
+  acción, sondear con checks de píxeles hasta que el frame muestre el estado esperado
+  (`/tmp/opencode/poll.py`: caja verde del botón/indicador propio de cada estado) antes
+  de dar por buena la captura, y contrastar siempre marcadores de píxeles si la lectura
+  de la imagen duda.

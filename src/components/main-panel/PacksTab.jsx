@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Skeleton from '../ui/Skeleton';
 import { useStore } from '../../store';
 import {
   getLauncherDir,
@@ -79,7 +80,12 @@ export default function PacksTab({ instance, type }) {
           </button>
         </div>
       </div>
-      {packs.length === 0 ? (
+      {loading && packs.length === 0 ? (
+        <div className="packs-loading" role="status" aria-live="polite">
+          <span className="panel-sr-only">Cargando {label}...</span>
+          <Skeleton lines={3} height={64} radius={10} />
+        </div>
+      ) : packs.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-illustration">{icon}</div>
           <h3 className="empty-state-title">Sin {label.toLowerCase()}</h3>
@@ -91,7 +97,7 @@ export default function PacksTab({ instance, type }) {
           </button>
         </div>
       ) : (
-        <div className="mods-list" style={{ marginTop: 12 }}>
+        <div className="mods-list" style={{ marginTop: 'var(--gap-md)' }}>
           {packs.map(pack => (
             <div key={pack.filename} className="mod-row">
               <div className="mod-row-icon">{icon}</div>

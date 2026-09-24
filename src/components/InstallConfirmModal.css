@@ -1,4 +1,6 @@
-/* InstallConfirmModal.css */
+/* InstallConfirmModal.css
+   Shell propio (.icm-overlay/.icm-modal) — fuera de la lista de migración
+   de la Fase 3; solo renovación visual sobre tokens. */
 
 .icm-overlay {
   position: fixed;
@@ -7,19 +9,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 300;
+  z-index: var(--z-modal);
   backdrop-filter: blur(3px);
 }
 
 .icm-modal {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   width: 540px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
@@ -28,53 +30,53 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 20px 24px 16px;
+  padding: var(--gap-lg) var(--gap-lg) var(--gap-md);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .icm-title {
-  font-size: 17px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
 
 .icm-subtitle {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
-  margin: 4px 0 0;
+  margin: var(--gap-xs) 0 0;
 }
 
 /* Body */
 .icm-body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 24px;
+  padding: var(--gap-md) var(--gap-lg);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--gap-md);
 }
 
 .icm-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--gap-sm);
 }
 
 .icm-section-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--gap-sm);
 }
 
-.icm-section-warn .icm-section-label { color: var(--amber, #ffb74d); }
-.icm-section-error .icm-section-label { color: var(--red, #ef5350); }
+.icm-section-warn .icm-section-label { color: var(--amber); }
+.icm-section-error .icm-section-label { color: var(--red); }
 
 /* Badges */
 .icm-badge {
@@ -83,26 +85,31 @@
   padding: 2px 6px;
   border-radius: 10px;
 }
-.icm-badge-blue   { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.icm-badge-blue   { background: color-mix(in srgb, var(--blue) 15%, transparent); color: var(--blue); }
 .icm-badge-gray   { background: var(--bg-base); color: var(--text-muted); }
-.icm-badge-yellow { background: rgba(255,183,77,0.15); color: #ffb74d; }
-.icm-badge-red    { background: rgba(239,83,80,0.15); color: #ef5350; }
+.icm-badge-yellow { background: color-mix(in srgb, var(--amber) 15%, transparent); color: var(--amber); }
+.icm-badge-red    { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); }
 
 /* Mod row (principal) */
 .icm-mod-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--gap-md);
   background: var(--bg-base);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  padding: 10px var(--gap-md);
+  transition: border-color var(--transition);
+}
+
+.icm-mod-row:hover {
+  border-color: var(--border-accent);
 }
 
 .icm-mod-icon {
   width: 36px;
   height: 36px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -110,7 +117,7 @@
 .icm-mod-icon-placeholder {
   width: 36px;
   height: 36px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   display: flex;
   align-items: center;
@@ -136,8 +143,8 @@
 .icm-mod-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
+  gap: var(--gap-xs);
+  margin-top: var(--gap-xs);
 }
 
 .icm-tag {
@@ -145,7 +152,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
 }
 
@@ -159,7 +166,7 @@
   color: var(--accent);
   background: var(--accent-glow);
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
 
@@ -173,11 +180,16 @@
 .icm-dep-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: 5px;
+  gap: var(--gap-sm);
+  padding: 5px var(--gap-sm);
+  border-radius: var(--radius-sm);
   background: var(--bg-base);
-  font-size: 12px;
+  font-size: var(--fs-sm);
+  transition: background var(--transition);
+}
+
+.icm-dep-row:hover {
+  background: var(--bg-hover);
 }
 
 .icm-dep-indent {
@@ -193,12 +205,12 @@
 
 .icm-dep-ver {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .icm-dep-size {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   min-width: 50px;
   text-align: right;
 }
@@ -207,13 +219,13 @@
 .icm-skip-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  font-size: 12px;
+  gap: var(--gap-sm);
+  padding: var(--gap-xs) var(--gap-sm);
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
-.icm-skip-icon { color: #4caf50; }
+.icm-skip-icon { color: var(--accent); }
 
 .icm-skip-id { flex: 1; }
 
@@ -226,34 +238,34 @@
 .icm-issues-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--gap-xs);
 }
 
 .icm-issue {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   line-height: 1.4;
 }
 
 .icm-issue-warn {
-  background: rgba(255,183,77,0.08);
-  border: 1px solid rgba(255,183,77,0.2);
-  color: #ffcc80;
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 20%, transparent);
+  color: var(--amber);
 }
 
 .icm-issue-error {
-  background: rgba(239,83,80,0.08);
-  border: 1px solid rgba(239,83,80,0.2);
-  color: #ef9a9a;
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red) 20%, transparent);
+  color: var(--red);
 }
 
 /* Footer */
 .icm-footer {
-  padding: 14px 24px;
+  padding: var(--gap-md) var(--gap-lg);
   border-top: 1px solid var(--border);
   display: flex;
-  gap: 10px;
+  gap: var(--gap-sm);
   justify-content: flex-end;
   flex-shrink: 0;
 }

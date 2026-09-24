@@ -4,6 +4,7 @@ import { createInstance, POPULAR_VERSIONS, LOADERS } from '../lib/instances';
 import { listVersions } from '../lib/mojang';
 import { getCompatibleLoaderVersions, getLatestCompatibleVersion, isLoaderAvailable } from '../lib/loaders/versions';
 import Select from './ui/Select';
+import Modal from './ui/Modal';
 
 const ICONS = ['🟩','⛏','🌲','🔥','❄️','⚡','🏔','🌊','🐉','💎','🛡','🗡','🧪','🌙','☀️','🎯'];
 
@@ -111,19 +112,47 @@ export default function NewInstanceModal() {
   }, [loader, availableVersions]);
 
   return (
-    <div className="overlay" onClick={closeModal}>
-      <div className="modal modal--md" onClick={e => e.stopPropagation()}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div>
-            <h2 style={{ color: 'var(--text-primary)' }}>Nueva instancia</h2>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Paso {step} de 2
-            </p>
-          </div>
-          <button className="btn btn-ghost btn-sm" onClick={closeModal}>✕</button>
-        </div>
+    <Modal
+      size="md"
+      title="Nueva instancia"
+      subtitle={`Paso ${step} de 2`}
+      onClose={closeModal}
+      footer={(
+        <>
+          {step === 1 ? (
+            <>
+              <button id="btn-cancel-new" className="btn btn-ghost" style={{ flex: 1 }} onClick={closeModal}>
+                Cancelar
+              </button>
+              <button
+                id="btn-next-step"
+                className="btn btn-primary"
+                style={{ flex: 2 }}
+                onClick={() => setStep(2)}
+                disabled={!canNext1}
+              >
+                Siguiente →
+              </button>
+            </>
+          ) : (
+            <>
+              <button id="btn-back-step" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setStep(1)}>
+                ← Atrás
+              </button>
+              <button
+                id="btn-create-instance"
+                className="btn btn-primary"
+                style={{ flex: 2 }}
+                onClick={handleCreate}
+                disabled={!canCreate}
+              >
+                ✓ Crear instancia
+              </button>
+            </>
+          )}
+        </>
+      )}
+    >
 
         {/* Steps indicator */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
@@ -341,42 +370,6 @@ export default function NewInstanceModal() {
           </div>
         )}
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-          {step === 1 ? (
-            <>
-              <button id="btn-cancel-new" className="btn btn-ghost" style={{ flex: 1 }} onClick={closeModal}>
-                Cancelar
-              </button>
-              <button
-                id="btn-next-step"
-                className="btn btn-primary"
-                style={{ flex: 2 }}
-                onClick={() => setStep(2)}
-                disabled={!canNext1}
-              >
-                Siguiente →
-              </button>
-            </>
-          ) : (
-            <>
-              <button id="btn-back-step" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setStep(1)}>
-                ← Atrás
-              </button>
-              <button
-                id="btn-create-instance"
-                className="btn btn-primary"
-                style={{ flex: 2 }}
-                onClick={handleCreate}
-                disabled={!canCreate}
-              >
-                ✓ Crear instancia
-              </button>
-            </>
-          )}
-        </div>
-
-      </div>
-    </div>
+    </Modal>
   );
 }

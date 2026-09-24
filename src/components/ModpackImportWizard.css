@@ -26,12 +26,19 @@
 /* ─── Step Indicator ───────────────────────────────────────────────────────── */
 .wizard-steps-indicator {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: var(--gap-md);
   padding: var(--gap-lg) var(--gap-xl);
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
+}
+
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-xs);
 }
 
 .wizard-step-dot {
@@ -45,14 +52,18 @@
   justify-content: center;
   font-weight: 600;
   color: var(--text-secondary);
-  transition: all 0.2s ease;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    box-shadow var(--transition);
 }
 
 .wizard-step-dot.active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg-base);
-  box-shadow: 0 0 12px rgba(0, 230, 118, 0.3);
+  box-shadow: 0 0 12px var(--accent-glow-strong);
 }
 
 .wizard-step-dot.done {
@@ -61,11 +72,32 @@
   color: var(--bg-base);
 }
 
+.wizard-step-name {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color var(--transition);
+}
+
+.wizard-step.is-active .wizard-step-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.wizard-step.is-done .wizard-step-name {
+  color: var(--text-secondary);
+}
+
 .wizard-step-line {
   width: 40px;
   height: 2px;
+  margin-top: 17px; /* centra la línea con el punto de 36px */
   background: var(--text-muted);
-  transition: background 0.2s ease;
+  transition: background var(--transition);
+}
+
+.wizard-step-line.done {
+  background: var(--accent);
 }
 
 /* ─── Main Content Area ────────────────────────────────────────────────────── */
@@ -93,7 +125,7 @@
   font-size: 18px;
   cursor: pointer;
   color: var(--text-secondary);
-  transition: all 0.2s ease;
+  transition: color var(--transition), background-color var(--transition), border-color var(--transition);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,29 +139,27 @@
   border-color: var(--accent);
 }
 
-.wizard-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-lg);
-  padding: var(--gap-xl) var(--gap-lg);
-  color: var(--text-secondary);
-  min-height: 300px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 .wizard-error {
-  background: rgba(255, 0, 0, 0.1);
-  border: 1px solid rgba(255, 0, 0, 0.3);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red) 35%, transparent);
   border-radius: var(--radius-md);
   padding: var(--gap-md);
-  color: #ff6b6b;
+  color: var(--red);
   font-size: 14px;
   margin: var(--gap-md) 0;
+}
+
+/* Texto solo para lectores de pantalla (Skeleton de carga) */
+.wizard-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ─── Buttons ──────────────────────────────────────────────────────────────── */
@@ -140,6 +170,15 @@
   margin-top: var(--gap-lg);
 }
 
+/* Jerarquía dentro de los grupos: la acción avance manda, "Atrás" se calla */
+.wizard-button-group .btn-ghost {
+  color: var(--text-secondary);
+}
+
+.wizard-button-group .btn-primary {
+  box-shadow: var(--shadow-accent);
+}
+
 .btn {
   padding: var(--gap-md) var(--gap-lg);
   border: none;
@@ -147,7 +186,12 @@
   font-weight: 500;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    background-color var(--transition),
+    color var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
 }
 
 .btn-primary {
@@ -156,7 +200,7 @@
 }
 
 .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 0 12px rgba(0, 230, 118, 0.3);
+  box-shadow: 0 0 12px var(--accent-glow-strong);
   transform: translateY(-1px);
 }
 

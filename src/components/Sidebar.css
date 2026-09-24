@@ -19,12 +19,12 @@
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  padding: 10px 12px;
+  padding: var(--gap-sm) var(--gap-md);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition);
+  transition: background-color var(--transition), border-color var(--transition);
 }
 
 .profile-card:hover {
@@ -36,12 +36,12 @@
   width: 34px;
   height: 34px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #1a3a2a, #0d2518);
+  background: linear-gradient(135deg, var(--accent-glow-strong), var(--bg-base));
   border: 1px solid var(--border-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: var(--fs-xl);
   flex-shrink: 0;
 }
 
@@ -51,68 +51,91 @@
 }
 
 .profile-name {
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .profile-mode {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--amber);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--gap-xs);
 }
 
 .profile-edit-icon {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   flex-shrink: 0;
+  transition: color var(--transition);
 }
 
-/* --- Nav --- */
+.profile-card:hover .profile-edit-icon {
+  color: var(--text-primary);
+}
+
+/* --- Nav ---
+   Sección propia con borde inferior: perfil | menú | instancias | pie. */
 .sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-xs);
   padding: var(--gap-sm);
+  border-bottom: 1px solid var(--border);
 }
 
 .sidebar-nav-label {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 8px 8px 4px;
+  padding: var(--gap-xs) var(--gap-sm);
 }
 
 .sidebar-nav-item {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  padding: 9px 12px;
+  /* 12px de padding: el icono queda en x=21px, alineado con el icono de
+     .instance-card (8 de lista + 1 de borde + 12 de padding). */
+  padding: var(--gap-sm) 12px;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 500;
-  transition: all var(--transition);
-  border: none;
+  transition: background-color var(--transition), border-color var(--transition),
+    color var(--transition);
   background: none;
   width: 100%;
   text-align: left;
 }
 
 .sidebar-nav-item:hover {
-  background: var(--bg-elevated);
+  background: var(--bg-hover);
+  border-color: var(--border);
   color: var(--text-primary);
 }
 
+/* Activo: dominante frente a hover — glow + borde accent + texto accent. */
 .sidebar-nav-item.active {
   background: var(--accent-glow);
+  border-color: var(--border-accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-nav-item.active:hover {
+  background: var(--accent-glow);
+  border-color: var(--border-accent);
   color: var(--accent);
 }
 
 .sidebar-nav-item .nav-icon {
-  font-size: 15px;
+  font-size: var(--fs-lg);
   width: 20px;
   text-align: center;
   flex-shrink: 0;
@@ -127,7 +150,7 @@
 }
 
 .sidebar-instances-title {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -137,6 +160,9 @@
 .sidebar-instances-list {
   flex: 1;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-xs);
   padding: 0 var(--gap-sm) var(--gap-sm);
 }
 
@@ -147,7 +173,7 @@
   padding: 8px 10px;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition);
+  transition: background-color var(--transition), border-color var(--transition);
   border: 1px solid transparent;
   margin-bottom: 2px;
 }
@@ -231,7 +257,7 @@
 }
 
 .sidebar-version {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   text-align: center;
 }

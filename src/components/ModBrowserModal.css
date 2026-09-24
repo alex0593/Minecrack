@@ -1,54 +1,23 @@
-/* ── Overlay ───────────────────────────────────────────────── */
-.modbrowser-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modbrowser-modal {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  width: 960px;
-  max-width: 96vw;
+/* ── Diálogo del explorador de mods (sobre la primitiva <Modal>) ──
+   El overlay, la cabecera y el botón × ahora los aporta <Modal>
+   (.ui-modal-overlay / .ui-modal-header / .ui-modal-close): las reglas
+   antiguas .modbrowser-overlay y .modbrowser-header se eliminaron porque
+   ya no se usan en ningún JSX. */
+.ui-modal.modbrowser-modal {
+  width: 100%;
+  max-width: 960px;
   height: 680px;
   max-height: 92vh;
+  overflow: hidden;
+}
+
+/* Filtros + lista/detalle van a sangre: sin padding ni scroll en el body */
+.ui-modal.modbrowser-modal .ui-modal-body {
   display: flex;
   flex-direction: column;
+  padding: 0;
   overflow: hidden;
-  box-shadow: var(--shadow-md);
 }
-
-/* ── Header ────────────────────────────────────────────────── */
-.modbrowser-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.modbrowser-header h2 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  transition: color var(--transition);
-}
-.modal-close:hover { color: var(--text-primary); }
 
 /* ── Body (lista + detalle) ────────────────────────────────── */
 .modbrowser-body {
@@ -61,19 +30,20 @@
 .modbrowser-detail-panel {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: var(--gap-lg);
 }
 
-.modbrowser-deps {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.modbrowser-dep-item {
-  font-size: 12px;
+/* ── Botón × del shell antiguo ───────────────────────────────
+   Sigue usándose fuera de este fichero (InstallConfirmModal,
+   InstanceSettingsModal, ShaderPackBrowserModal, …): conservar. */
+.modal-close {
+  background: none;
+  border: none;
   color: var(--text-muted);
-  background: var(--bg-elevated);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
-  padding: 5px 10px;
+  transition: color var(--transition);
 }
+.modal-close:hover { color: var(--text-primary); }

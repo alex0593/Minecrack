@@ -1,16 +1,20 @@
-.export-instance-modal {
+.ui-modal.export-instance-modal {
   max-width: 520px;
 }
 
 .export-section {
-  margin-bottom: 24px;
+  margin-bottom: var(--gap-lg);
+}
+
+.export-section:last-child {
+  margin-bottom: 0;
 }
 
 .export-section h3 {
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--gap-md) 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -18,14 +22,14 @@
 .export-checklist {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--gap-sm);
 }
 
 .export-checkbox {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--gap-md);
+  padding: var(--gap-md);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -51,12 +55,12 @@
   flex: 1;
   font-weight: 500;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 
 .export-checkbox-desc {
   display: block !important;
-  font-size: 11px !important;
+  font-size: var(--fs-xs) !important;
   color: var(--text-muted) !important;
   font-weight: 400 !important;
   margin-top: 2px;
@@ -64,15 +68,15 @@
 
 .export-format-buttons {
   display: flex;
-  gap: 12px;
+  gap: var(--gap-md);
 }
 
 .export-format-btn {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--gap-md);
+  padding: var(--gap-md);
   background: var(--bg-elevated);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
@@ -100,13 +104,13 @@
 }
 
 .export-format-title {
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .export-format-desc {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-top: 2px;
 }

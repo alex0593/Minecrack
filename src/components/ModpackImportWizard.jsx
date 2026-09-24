@@ -7,7 +7,7 @@
  * PASO 4: INSTALACIÓN — Progress tracking and completion
  */
 
-import { useState, Component } from 'react';
+import { useState, Component, Fragment } from 'react';
 import Step1Search from './modpack-import-wizard/Step1Search';
 import Step2Preview from './modpack-import-wizard/Step2Preview';
 import Step3Config from './modpack-import-wizard/Step3Config';
@@ -15,6 +15,44 @@ import Step4Install from './modpack-import-wizard/Step4Install';
 import './ModpackImportWizard.css';
 
 const LOADERS_MODPACK = ['fabric', 'forge', 'quilt', 'neoforge'];
+
+// Pasos del wizard (orden coherente con el indicador visual)
+const WIZARD_STEPS = [
+  { key: 'search', num: 1, label: 'Búsqueda' },
+  { key: 'preview', num: 2, label: 'Vista previa' },
+  { key: 'config', num: 3, label: 'Configuración' },
+  { key: 'install', num: 4, label: 'Instalación' },
+];
+
+/** Indicador de pasos: activo = accent, completados = ✓ */
+function StepsIndicator({ currentStep }) {
+  const currentIdx = WIZARD_STEPS.findIndex(s => s.key === currentStep);
+
+  return (
+    <div className="wizard-steps-indicator">
+      {WIZARD_STEPS.map((s, i) => {
+        const isActive = i === currentIdx;
+        const isDone = i < currentIdx;
+        return (
+          <Fragment key={s.key}>
+            {i > 0 && (
+              <div className={`wizard-step-line ${i <= currentIdx ? 'done' : ''}`} aria-hidden="true" />
+            )}
+            <div
+              className={`wizard-step ${isActive ? 'is-active' : ''} ${isDone ? 'is-done' : ''}`}
+              aria-current={isActive ? 'step' : undefined}
+            >
+              <span className={`wizard-step-dot ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
+                {isDone ? '✓' : s.num}
+              </span>
+              <span className="wizard-step-name">{s.label}</span>
+            </div>
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── Error Boundary ─────────────────────────────────────────────────────────
 class WizardErrorBoundary extends Component {
@@ -72,6 +110,9 @@ export default function ModpackImportWizard({ onClose }) {
     <WizardErrorBoundary onClose={onClose}>
     <div className={`wizard-container ${currentStep === 'preview' ? 'wizard-container-compact' : ''}`}>
       <div className={`wizard-modal ${currentStep === 'preview' ? 'wizard-modal-compact' : ''}`}>
+        {/* Step indicator */}
+        <StepsIndicator currentStep={currentStep} />
+
         {/* Content */}
         <div className="wizard-content">
           {currentStep === 'search' && (

@@ -1,6 +1,7 @@
-/** ModpackDownloadModal.css */
-
-.modpack-download-modal {
+/** ModpackDownloadModal.css
+ *  Cross-use: esta clase la reutilizan ModpackDownloadModal (vistas
+ *  Search/Preview/Progress) y ModpackInstallModal — no renombrar. */
+.ui-modal.modpack-download-modal {
   max-width: 600px;
   min-height: 400px;
 }

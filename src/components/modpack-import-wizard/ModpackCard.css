@@ -6,19 +6,23 @@
   border-radius: var(--radius-md);
   padding: var(--gap-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    border-color var(--transition),
+    background-color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
   text-align: left;
 }
 
 .wizard-modpack-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 230, 118, 0.1);
+  box-shadow: 0 8px 16px var(--accent-glow);
 }
 
 .wizard-modpack-card.selected {
   border-color: var(--accent);
-  background: rgba(0, 230, 118, 0.05);
+  background: var(--accent-glow);
 }
 
 .wizard-card-icon {

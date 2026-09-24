@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import ModsPreviewModal from './ModsPreviewModal';
 import ErrorModal from './ui/ErrorModal';
 import ProgressBar from './ui/ProgressBar';
+import Modal from './ui/Modal';
 import './ImportModsModal.css';
 
 export default function ImportModsModal({ instanceId, onClose }) {
@@ -145,99 +146,58 @@ export default function ImportModsModal({ instanceId, onClose }) {
     );
   }
 
-  // Mostrar pantalla de importación en progreso
+  // Mostrar pantalla de importación en progreso (overlay y × no cerraban)
   if (step === 'importing' || step === 'done') {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>{step === 'done' ? '✓ Mods importados' : '📥 Importando mods'}</h2>
+      <Modal
+        open
+        onClose={onClose}
+        title={step === 'done' ? 'Mods importados' : 'Importando mods'}
+        icon={step === 'done' ? '✓' : '📥'}
+        showClose={false}
+        closeOnOverlay={false}
+        footer={
+          step !== 'done' ? (
+            <button className="btn btn-ghost" onClick={handleCancel} disabled={step === 'done'}>
+              Cancelar
+            </button>
+          ) : null
+        }
+      >
+        {step === 'done' ? (
+          <div style={{ textAlign: 'center', color: 'var(--accent)', fontSize: 14 }}>
+            <p>✓ {preview?.mods?.length || 'Los'} mod(s) se han importado correctamente</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
+              Cerrando en un momento...
+            </p>
           </div>
-
-          <div className="modal-body" style={{ paddingTop: 24 }}>
-            {step === 'done' ? (
-              <div style={{ textAlign: 'center', color: 'var(--accent)', fontSize: 14 }}>
-                <p>✓ {preview?.mods?.length || 'Los'} mod(s) se han importado correctamente</p>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
-                  Cerrando en un momento...
-                </p>
-              </div>
-            ) : (
-              <>
-                <ProgressBar
-                  value={progress}
-                  max={100}
-                  label={`${Math.round(progress)}%`}
-                  animated
-                  style={{ marginBottom: 16 }}
-                />
-                <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
-                  Comprimiendo y extrayendo {preview?.mods?.length || 0} mod(s)...
-                </p>
-              </>
-            )}
-          </div>
-
-          {step !== 'done' && (
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={handleCancel} disabled={step === 'done'}>
-                Cancelar
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+        ) : (
+          <>
+            <ProgressBar
+              value={progress}
+              max={100}
+              label={`${Math.round(progress)}%`}
+              animated
+              style={{ marginBottom: 16 }}
+            />
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
+              Comprimiendo y extrayendo {preview?.mods?.length || 0} mod(s)...
+            </p>
+          </>
+        )}
+      </Modal>
     );
   }
 
-  // Pantalla inicial
+  // Pantalla inicial (overlay y × cerraban: closeOnOverlay por defecto)
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>📥 Importar Mods</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="modal-body">
-          <div style={{ marginBottom: 20 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 12px 0', color: 'var(--text-primary)' }}>
-              Modo de importación
-            </h3>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button
-                className={`import-mode-button ${mode === 'merge' ? 'active' : ''}`}
-                onClick={() => setMode('merge')}
-              >
-                <span style={{ fontSize: 18 }}>🔗</span>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>Combinar</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Mantener existentes
-                  </div>
-                </div>
-              </button>
-              <button
-                className={`import-mode-button ${mode === 'replace' ? 'active' : ''}`}
-                onClick={() => setMode('replace')}
-              >
-                <span style={{ fontSize: 18 }}>🔄</span>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>Reemplazar</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Eliminar todos
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6 }}>
-            Selecciona un archivo .zip que contenga una carpeta <code style={{ background: 'var(--bg-elevated)', padding: '2px 6px', borderRadius: 3, fontFamily: 'var(--font-mono)' }}>mods/</code> con tus mods en formato .jar.
-          </p>
-        </div>
-
-        <div className="modal-footer">
+    <Modal
+      open
+      onClose={onClose}
+      title="Importar Mods"
+      icon="📥"
+      footer={
+        <>
           <button
             className="btn btn-ghost"
             onClick={onClose}
@@ -252,8 +212,44 @@ export default function ImportModsModal({ instanceId, onClose }) {
           >
             {step === 'inspecting' ? '⏳ Inspeccionando...' : '📂 Seleccionar ZIP'}
           </button>
+        </>
+      }
+    >
+      <div style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 12px 0', color: 'var(--text-primary)' }}>
+          Modo de importación
+        </h3>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button
+            className={`import-mode-button ${mode === 'merge' ? 'active' : ''}`}
+            onClick={() => setMode('merge')}
+          >
+            <span style={{ fontSize: 18 }}>🔗</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Combinar</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                Mantener existentes
+              </div>
+            </div>
+          </button>
+          <button
+            className={`import-mode-button ${mode === 'replace' ? 'active' : ''}`}
+            onClick={() => setMode('replace')}
+          >
+            <span style={{ fontSize: 18 }}>🔄</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Reemplazar</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                Eliminar todos
+              </div>
+            </div>
+          </button>
         </div>
       </div>
-    </div>
+
+      <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6 }}>
+        Selecciona un archivo .zip que contenga una carpeta <code style={{ background: 'var(--bg-elevated)', padding: '2px 6px', borderRadius: 3, fontFamily: 'var(--font-mono)' }}>mods/</code> con tus mods en formato .jar.
+      </p>
+    </Modal>
   );
 }

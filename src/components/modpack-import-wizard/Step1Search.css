@@ -49,7 +49,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: color var(--transition), border-color var(--transition);
 }
 
 .wizard-tab:hover:not(:disabled) {
@@ -78,6 +78,20 @@
   align-items: center;
 }
 
+/* Métricas: input y select de la fila comparten altura (sin tocar colores) */
+.wizard-search-row .wizard-search-input {
+  height: 44px;
+  padding: 0 var(--gap-md);
+}
+
+.wizard-search-row select.wizard-version-select {
+  height: 44px;
+  min-width: 150px;
+  padding: 0 30px 0 12px; /* deja hueco al chevron global (right 9px) */
+  font-size: 14px;
+  border-radius: var(--radius-md); /* misma métrica que el input de la fila */
+}
+
 .wizard-search-input {
   flex: 1;
   padding: var(--gap-md);
@@ -91,7 +105,7 @@
 .wizard-search-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.1);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .wizard-version-select {
@@ -118,13 +132,14 @@
   align-content: start;
 }
 
-.wizard-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.wizard-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  padding: var(--gap-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .wizard-no-results {

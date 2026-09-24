@@ -4,7 +4,7 @@
 
 Three apps live in this repo:
 
-- **Root — Tauri 2 launcher**: React frontend in `src/` (UI in `src/components/`, hooks in `src/hooks/`, business and API logic in `src/lib/`, global state in `src/store.jsx`); Rust backend in `src-tauri/src/`. Keep all IPC behind `src/lib/tauri.js`. Tauri commands are registered in `src-tauri/src/lib.rs`, which delegates to the `sync`, `safe_fs`, `archives`, `authority`, `network`, `transfers`, and `processes` modules. Tauri config and icons are under `src-tauri/`; launcher tests live in `src/test/`; component CSS sits beside its JSX file.
+- **Root — Tauri 2 launcher**: React frontend in `src/` (UI in `src/components/`, hooks in `src/hooks/`, business and API logic in `src/lib/`, global state in `src/store/`); Rust backend in `src-tauri/src/`. Keep all IPC behind the `src/lib/tauri/` barrel. Tauri commands are registered in `src-tauri/src/lib.rs`, which delegates to the `sync`, `safe_fs`, `archives`, `authority`, `network`, `transfers`, and `processes` modules. Tauri config and icons are under `src-tauri/`; launcher tests live in `src/test/`; component CSS sits beside its JSX file.
 - **`backend/` — modpack ecosystem API**: FastAPI + SQLModel on Python 3.13, Postgres via `compose.yaml`, Alembic migrations in `backend/migrations/`, Python tests in `backend/tests/`, ops runbook in `backend/OPERATIONS.md`.
 - **`admin/` — admin panel**: standalone Vite + React app (its own `package.json`).
 
@@ -30,7 +30,7 @@ No JavaScript linter or formatter is configured; preserve nearby formatting. CI 
 
 ## IPC & Browser-Dev Gotchas
 
-`tauriCmd` in `src/lib/tauri.js` silently falls back to mock responses whenever `invoke` is unavailable **or a Rust command fails** — backend bugs will not throw in browser mode. `tauriStrictCmd` throws instead (used for `sync_instance` and `restore_quarantine`). Always debug integration issues inside `npm run tauri dev`, never the browser. Prefer the typed wrappers in `tauri.js` (`launchGame`, `detectJava`, `downloadFile`, …) over raw `tauriCmd`.
+`tauriCmd` in `src/lib/tauri/` silently falls back to mock responses whenever `invoke` is unavailable **or a Rust command fails** — backend bugs will not throw in browser mode. `tauriStrictCmd` throws instead (used for `sync_instance` and `restore_quarantine`). Always debug integration issues inside `npm run tauri dev`, never the browser. Prefer the typed wrappers in `src/lib/tauri/` (`launchGame`, `detectJava`, `downloadFile`, …) over raw `tauriCmd`.
 
 ## Ecosystem Sync
 

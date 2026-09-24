@@ -42,7 +42,7 @@ Launcher ↔ ecosystem: an instance may carry `remoteModpack { apiBaseUrl, modpa
 
 ### Frontend ↔ Backend IPC
 
-All communication goes through `src/lib/tauri.js`, which wraps Tauri's `invoke` (commands) and `listen` (events). In browser dev mode without Tauri, this file returns mock responses so the UI works standalone.
+All communication goes through the `src/lib/tauri/` barrel (`index.js` re-exports what the old single `tauri.js` did; internals live in `core.js` for `invoke`/`listen` primitives and `mock.js` for dev fallbacks, plus domain modules `fs`, `downloads`, `mods`, `packs`, `instances`, `game`, `dialog`). In browser dev mode without Tauri, it returns mock responses so the UI works standalone.
 
 ```
 React → tauriCmd('command_name', args) → Rust #[tauri::command] fn
@@ -51,7 +51,7 @@ Rust  → window.emit("event://name", payload) → tauriListen('event://name', h
 
 **Important**: `tauriCmd` silently falls back to mock responses on failure — failed commands do not throw in browser dev mode. Always test in Tauri (not browser) when debugging backend integration.
 
-Typed wrappers in `tauri.js` (prefer these over raw `tauriCmd`): `getLauncherDir`, `downloadFile`, `launchGame`, `detectJava`, `listMods`, `downloadMod`, `verifyInstance`, `removeDir`, `copyDir`, etc.
+Typed wrappers in `src/lib/tauri/` (prefer these over raw `tauriCmd`): `getLauncherDir`, `downloadFile`, `launchGame`, `detectJava`, `listMods`, `downloadMod`, `verifyInstance`, `removeDir`, `copyDir`, etc.
 
 ### Rust Commands (registered in `src-tauri/src/lib.rs`)
 
@@ -76,7 +76,7 @@ Layout: `instances/{uuid}/`, `versions/{version}/`, `libraries/`, `assets/`, `ru
 
 ### State Management
 
-`src/store.jsx` — single React Context + `useReducer`. Split into `StateContext` (reads) and `DispatchContext` (writes) to prevent unnecessary re-renders. All global state: `instances[]`, `selectedInstanceId`, `instanceMods[]`, `instanceResourcePacks[]`, `instanceShaderpacks[]`, `profile{}`, `modal`, `download{}`, `gameRunning`, `gameLogs[]`, `config{}`. Access via `useStore()` (both), `useStoreState()` (read-only), or `useDispatch()` (dispatch-only). No side effects in the reducer.
+`src/store/` — single React Context + `useReducer`. Entry point `index.jsx` holds the provider and hooks; `reducer.js` chains pure slices (`slices/config.js`, `slices/instances.js`, `slices/session.js`, `slices/game.js`, `slices/error.js` — each answers only its own action types), with `initial-state.js` separate. Contexts are split into `StateContext` (reads) and `DispatchContext` (writes) to prevent unnecessary re-renders. All global state: `instances[]`, `selectedInstanceId`, `instanceMods[]`, `instanceResourcePacks[]`, `instanceShaderpacks[]`, `profile{}`, `modal`, `download{}`, `gameRunning`, `gameLogs[]`, `config{}`. Access via `useStore()` (both), `useStoreState()` (read-only), or `useDispatch()` (dispatch-only). No side effects in the reducer.
 
 `SELECT_INSTANCE` clears `instanceMods`, `instanceResourcePacks`, and `instanceShaderpacks` to avoid stale data when switching instances.
 

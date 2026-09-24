@@ -50,6 +50,13 @@ la app 1200×760).
 5. **AppImage no empaqueta** — `npm run tauri build` generó `deb` y `rpm`, pero el paso
    AppImage falló con `failed to run linuxdeploy` (falta `patchelf` en el entorno).
    Resolver en la Fase 5.
+   - **Estado (2026-09-24): resuelto en v1.3.2** — dos causas: (1) `patchelf`
+     ausente → instalado en el venv sin sudo (`pip install patchelf` en
+     `/tmp/opencode/venv-x11`); (2) el plugin GTK de linuxdeploy abortaba con
+     `no 'libdir' variable for 'librsvg-2.0'` (falta `librsvg2-dev`, sin sudo) →
+     stub `/tmp/opencode/pkgconfig/librsvg-2.0.pc` con `libdir` correcto.
+     Receta de build: `PATH=<venv>/bin:$PATH PKG_CONFIG_PATH=<stub-dir> npm run tauri build`.
+     Los 3 formatos ya empaquetan (AppImage 88,9 MB, test de extracción OK).
 
 ## Hallazgos adicionales (post-baseline, descubiertos en la Fase 3)
 

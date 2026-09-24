@@ -1,11 +1,11 @@
 # Roadmap — Minecrack
 
-> Última revisión: 2026-09-23. Fuentes: `git log`, working tree y la documentación del repo.
+> Última revisión: 2026-09-24. Fuentes: `git log`, working tree y la documentación del repo.
 > Los comandos de verificación están en [`AGENTS.md`](./AGENTS.md).
 
 ## ✅ Completado
 
-- **Lanzador Tauri 2 + React 19** (v1.3.1): instancias múltiples, mod loaders (Vanilla, Fabric, Quilt, Forge/NeoForge), detección automática de Java, skins (Crafatar + subida propia), navegador unificado de modpacks (CurseForge + Modrinth).
+- **Lanzador Tauri 2 + React 19** (v1.3.2): instancias múltiples, mod loaders (Vanilla, Fabric, Quilt, Forge/NeoForge), detección automática de Java, skins (Crafatar + subida propia), navegador unificado de modpacks (CurseForge + Modrinth).
 - **Ecosistema oficial** (`feat: add official modpack ecosystem sync`):
   - `backend/` — API FastAPI + Postgres (`compose.yaml`), releases inmutables con retiro/rollback (ver [`backend/OPERATIONS.md`](./backend/OPERATIONS.md)).
   - `admin/` — panel de administración (Vite + React).
@@ -21,7 +21,7 @@
 2. **Completar checklist manual** de [`docs/archivo/IMPLEMENTATION_STATUS.md`](./docs/archivo/IMPLEMENTATION_STATUS.md) (modpack wizard con ambos orígenes, los 5 loaders, skins, indicadores de progreso).
 3. **Piloto del ecosistema** antes de despliegue general (de `backend/OPERATIONS.md`): instancia Fabric pequeña; verificar actualización, JAR corrupto, JAR adicional, interrupción de red y rollback.
 4. ~~**Refactor Rust (lib.rs → módulos)**~~ ✅ Listo (`15c5730`, verificado y en CI).
-5. **Publicar v1.3.2** al cerrar la iniciativa de renovación/refactor (ver abajo).
+5. ~~**Publicar v1.3.2**~~ ✅ **Listo (2026-09-24)** — https://github.com/alex0593/Minecrack/releases/tag/v1.3.2 con AppImage + deb + rpm (publicada antes de cerrar las Fases 3–5, que continúan en `feat/ui-refresh`).
 
 ## 🧭 Iniciativa activa — Renovación de UI + refactor por fases
 

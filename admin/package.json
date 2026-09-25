@@ -6,14 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.6.0",
-    "vite": "^7.0.4",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "vite": "^7.0.4"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "jsdom": "^30.1.1",
+    "vitest": "^5.0.2"
+  }
 }
-

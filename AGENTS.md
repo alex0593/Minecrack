@@ -24,7 +24,7 @@ Backend:
 
 Admin:
 
-- `cd admin && npm install && npm run dev` — serves on port 1421 and proxies `/api` to `http://localhost:8000`.
+- `cd admin && npm install && npm run dev` — serves on port 1421 and proxies `/api` to `http://localhost:8000`. `cd admin && npm test` runs its Vitest suite (jsdom + Testing Library).
 
 No JavaScript linter or formatter is configured; preserve nearby formatting. CI runs on every push/PR to `main` (`.github/workflows/ci.yml`): Vitest + `npm run build`, `pytest` from `backend/`, and `cargo fmt --check` + `cargo check` + `cargo test` from `src-tauri/` — keep all four green.
 

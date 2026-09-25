@@ -40,7 +40,7 @@ Decisiones (2026-09-23): por fases · pulido coherente (mantener ADN oscuro/esme
 6. **ESLint + Prettier** — cero herramientas de lint/format hoy; sin formatador, la consistencia depende del autor (ver `AGENTS.md` § "No JavaScript linter...").
 7. **CSP real en `src-tauri/tauri.conf.json`** — actualmente `"csp": null`; la app descarga y ejecuta contenido externo, merece una política estricta.
 8. **Rate limiting / bloqueo de intentos en el login admin** (`backend/app/main.py`) — solo hay JWT + CSRF, sin protección contra fuerza bruta.
-9. **Reducir `unwrap()` en Rust** — `sync.rs` (17), `safe_fs.rs` (8), `archives.rs` (7): un panic tumba el launcher; convertir a `Result<_, String>` como el resto del código.
+9. ~~**Reducir `unwrap()` en Rust**~~ ✅ **Listo (`0d87093`, 2026-09-25)** — el recuento original incluía `#[cfg(test)]`; en producción solo había **5 sitios**, todos convertidos a error recuperable: `safe_fs::lock` (poisoning → `into_inner`), `archives::tar_runtime_to_stage` (`parent()` → `ok_or`), `processes::logs` (`pop` → `if let`) y `processes::launch` (`take()` de stdout/stderr → `ok_or`); `sync.rs` y el resto del código tenían **0** en producción. El `.expect` del bootstrap Tauri en `lib.rs` se deja a propósito (si el event loop no arranca, no hay UI). Verificación: `cargo fmt --check` ✅ · `cargo check` ✅ · `cargo test` 20/20 ✅.
 10. **Tests de endpoints admin** — backend: ~20 endpoints, solo 12 tests (ninguno de publish/rollback, que son críticos); panel `admin/`: 0 tests.
 
 ## 💡 Backlog

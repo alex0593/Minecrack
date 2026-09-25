@@ -63,7 +63,8 @@ la app 1200×760).
      `no 'libdir' variable for 'librsvg-2.0'` (falta `librsvg2-dev`, sin sudo) →
      stub `/tmp/opencode/pkgconfig/librsvg-2.0.pc` con `libdir` correcto.
      Receta de build: `PATH=<venv>/bin:$PATH PKG_CONFIG_PATH=<stub-dir> npm run tauri build`.
-     Los 3 formatos ya empaquetan (AppImage 88,9 MB, test de extracción OK).
+     Los 3 formatos ya empaquetan (AppImage 88,9 MB, test de extracción OK),
+      reconfirmado en la Fase 5 (2026-09-24) con los 3 tests de integridad (dpkg-deb, magic rpm, extracción AppImage).
 
 ## Hallazgos adicionales (post-baseline, descubiertos en la Fase 3)
 
@@ -101,7 +102,47 @@ Mismos 8 superficies, mismo entorno (Xvfb `:99`, ventana 1200×760): binario v1.
 Sin cambios de comportamiento: rutas de navegación, modales y acciones responden igual
 (los 8 estados se alcanzaron con la misma secuencia de clics en ambos binarios).
 
-## Regeneración / automatización (también útil en Fase 5)
+## Verificación final (Fase 5, 2026-09-24)
+
+**Build** con la receta del hallazgo 5
+(`PATH=/tmp/opencode/venv-x11/bin:$PATH PKG_CONFIG_PATH=/tmp/opencode/pkgconfig npm run tauri build`)
+→ los 3 formatos, con tests de integridad:
+
+| Artefacto (`src-tauri/target/release/bundle/`) | Tamaño | Integridad |
+|---|---|---|
+| `deb/Minecrack_1.3.2_amd64.deb` | 6,0 MB | `dpkg-deb -I` ✓ — `minecrack`, Depends: libwebkit2gtk-4.1-0, libgtk-3-0 |
+| `rpm/Minecrack-1.3.2-1.x86_64.rpm` | 6,0 MB | magic `edabeedb` ✓ |
+| `appimage/Minecrack_1.3.2_amd64.AppImage` | 88,9 MB | `--appimage-extract` ✓ — binario ejecutable dentro |
+
+**Ejecución y capturas**: el binario final (`target/release/tauri-app`, el mismo
+empaquetado en los 3 formatos) corrió en Xvfb `:99` con el mismo protocolo y la
+misma secuencia de clics que la Fase 3 — **8/8 checks PASS a la primera** (sin
+reintentos ni esperas por repintado). Las cajas de `00-launch` y
+`03-instance-detail` se recalibraron: las originales fallaban incluso sobre las
+propias capturas de la Fase 3 (el texto de bienvenida está en y≈540-610, no en
+450-500; la fila de pestañas del detalle en (646,397)-(1200,460)). Capturas en
+`~/.ui-captures/final-phase5/`; scripts efímeros en `/tmp/opencode/`
+(`poll5.py` con los 8 checks, `phase5-capture.sh`, `phase5-checks.py`,
+`phase5-diff.py`).
+
+| Captura | vs baseline «antes» (iguales / media) | vs «después» Fase 3 (iguales / media) |
+|---|---|---|
+| `00-launch` | 97,4 % / 1,58 | 99,9 % / 0,01 |
+| `03-instance-detail` | 96,0 % / 2,65 | 99,8 % / 0,06 |
+| `04-settings` | 98,3 % / 0,89 | 100,0 % / 0,00 |
+| `05-modpack-browser` | 86,6 % / 13,93 | 100,0 % / 0,00 |
+| `06-new-instance` | 94,1 % / 2,52 | 99,8 % / 0,07 |
+| `07-console-tab` | 96,8 % / 1,88 | 99,8 % / 0,06 |
+| `08-add-mod` | 76,1 % / 4,95 | 100,0 % / 0,01 |
+| `09-import-instance` | 97,3 % / 0,99 | 99,9 % / 0,02 |
+
+Lectura: contra el baseline el resultado **replica la tabla de la Fase 3**
+(desviación ≤0,1 pp en todas las capturas: el renovamiento visual persiste en el
+paquete final); contra los «después» de la Fase 3 todo está en **99,8–100 %** → ni
+el refactor estructural de la Fase 4 ni el empaquetado cambian ni un píxel visible
+(los 0–0,2 % restantes son ruido de render/dinámico: cursor, animaciones).
+
+## Regeneración / automatización (usado en la Fase 5)
 
 - **Display aislado**: capturar siempre en Xvfb `:99` (nunca en el `:0.0` del escritorio
   real): `apt-get download xvfb && dpkg -x` (sin sudo) → `Xvfb :99 -screen 0 1920x1080x24`,

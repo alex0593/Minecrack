@@ -1,6 +1,6 @@
 # 🎮 Minecrack
 
-![Minecrack Version](https://img.shields.io/badge/version-1.3.0-emerald?style=for-the-badge)
+![Minecrack Version](https://img.shields.io/badge/version-1.5.0-emerald?style=for-the-badge)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202.0-blue?style=for-the-badge&logo=tauri)
 ![React](https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=for-the-badge&logo=react)
 ![Rust](https://img.shields.io/badge/Backend-Rust-black?style=for-the-badge&logo=rust)

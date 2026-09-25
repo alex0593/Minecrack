@@ -131,7 +131,11 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
 pub async fn lock(path: &Path) -> tokio::sync::OwnedMutexGuard<()> {
     static LOCKS: OnceLock<Mutex<HashMap<PathBuf, Weak<tokio::sync::Mutex<()>>>>> = OnceLock::new();
     let mutex = {
-        let mut locks = LOCKS.get_or_init(Default::default).lock().unwrap();
+        // A poisoned lock only means an earlier holder panicked; the map stays valid.
+        let mut locks = LOCKS
+            .get_or_init(Default::default)
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         locks.retain(|_, lock| lock.strong_count() > 0);
         let mutex = locks
             .get(path)

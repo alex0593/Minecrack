@@ -135,7 +135,7 @@ pub fn tar_runtime_to_stage(source: &Path, stage: &Path) -> Result<(), String> {
     for (output, target) in links {
         let target = output
             .parent()
-            .unwrap()
+            .ok_or("Entrada TAR sin directorio padre")?
             .join(target)
             .canonicalize()
             .map_err(|e| e.to_string())?;

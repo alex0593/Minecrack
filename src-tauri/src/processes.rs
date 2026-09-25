@@ -151,8 +151,8 @@ async fn logs<R: tokio::io::AsyncRead + Unpin>(
                     let _ = window.emit("game://logs", &pending);
                     pending.clear();
                     tokio::time::sleep(Duration::from_millis(100)).await;
-                } else {
-                    let _ = window.emit("game://log", pending.pop().unwrap());
+                } else if let Some(entry) = pending.pop() {
+                    let _ = window.emit("game://log", entry);
                 }
             }
         }
@@ -199,18 +199,10 @@ pub async fn launch(window: tauri::Window, config: LaunchConfig) -> Result<(), S
         "game://started",
         serde_json::json!({"runId": run_id, "pid": pid}),
     );
-    let stdout = tokio::spawn(logs(
-        child.stdout.take().unwrap(),
-        window.clone(),
-        run_id.clone(),
-        "info",
-    ));
-    let stderr = tokio::spawn(logs(
-        child.stderr.take().unwrap(),
-        window.clone(),
-        run_id.clone(),
-        "warn",
-    ));
+    let stdout_pipe = child.stdout.take().ok_or("Stdout de Java no disponible")?;
+    let stderr_pipe = child.stderr.take().ok_or("Stderr de Java no disponible")?;
+    let stdout = tokio::spawn(logs(stdout_pipe, window.clone(), run_id.clone(), "info"));
+    let stderr = tokio::spawn(logs(stderr_pipe, window.clone(), run_id.clone(), "warn"));
     let result = tokio::select! {
         status = child.wait() => status,
         _ = stopped.changed() => {

@@ -21,7 +21,7 @@
 2. **Completar checklist manual** de [`docs/archivo/IMPLEMENTATION_STATUS.md`](./docs/archivo/IMPLEMENTATION_STATUS.md) (modpack wizard con ambos orígenes, los 5 loaders, skins, indicadores de progreso).
 3. **Piloto del ecosistema** antes de despliegue general (de `backend/OPERATIONS.md`): instancia Fabric pequeña; verificar actualización, JAR corrupto, JAR adicional, interrupción de red y rollback.
 4. ~~**Refactor Rust (lib.rs → módulos)**~~ ✅ Listo (`15c5730`, verificado y en CI).
-5. ~~**Publicar v1.3.2**~~ ✅ **Listo (2026-09-24)** — https://github.com/alex0593/Minecrack/releases/tag/v1.3.2 con AppImage + deb + rpm (publicada antes de cerrar las Fases 3–5, que continúan en `feat/ui-refresh`). *Siguiente release*: **v1.4.0 preparada** en `feat/ui-refresh` (bump `af4c732` + artefactos deb/rpm/AppImage con tests de integridad) — pendiente fusionar [PR #1](https://github.com/alex0593/Minecrack/pull/1) y crear la release de GitHub.
+5. ~~**Publicar v1.3.2**~~ ✅ **Listo (2026-09-24)** — https://github.com/alex0593/Minecrack/releases/tag/v1.3.2 con AppImage + deb + rpm (se publicó antes de cerrar las Fases 3–5, que se completaron en `feat/ui-refresh`). ~~*Siguiente release*~~ **v1.5.0** ✅ **Preparada (2026-09-25)** — [PR #1](https://github.com/alex0593/Minecrack/pull/1) fusionado en `main` con rebase (13 commits, CI verde) y bump `3176b00`; artefactos deb/rpm/AppImage regenerados con tests de integridad. *Pendiente*: subir la release a GitHub (el tag `v1.4.0` ya estaba tomado por la release del 13/06/2026, de ahí el salto de versión).
 
 ## 🧭 Iniciativa activa — Renovación de UI + refactor por fases
 

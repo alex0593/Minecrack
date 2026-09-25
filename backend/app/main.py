@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import timezone
+import math
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile, status
@@ -7,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from . import ratelimit
 from .database import create_db_and_tables, get_session
 from .models import Mod, Modpack, ModpackRelease, ModVersion, ReleaseFile, ReleaseStatus, utcnow
 from .schemas import (
@@ -181,9 +183,20 @@ async def download_file(sha256: str, request: Request, session: Session = Depend
 
 
 @app.post("/api/v1/admin/login")
-async def login(payload: LoginRequest, response: Response) -> dict:
+async def login(payload: LoginRequest, response: Response, request: Request) -> dict:
+    client = request.client.host if request.client else "unknown"
+    key = ratelimit.login_key(payload.username, client)
+    wait = ratelimit.retry_after(key)
+    if wait is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts",
+            headers={"Retry-After": str(math.ceil(wait))},
+        )
     if not authenticate(payload.username, payload.password):
+        ratelimit.record_failure(key)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    ratelimit.clear(key)
     token, csrf = create_session()
     response.set_cookie(
         "minecrack_session", token, httponly=True, secure=settings.cookie_secure,

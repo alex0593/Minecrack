@@ -11,6 +11,8 @@ class Settings:
     admin_password: str = os.getenv("ADMIN_PASSWORD", "change-me")
     session_secret: str = os.getenv("SESSION_SECRET", "dev-only-secret-change-before-deploy")
     cookie_secure: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    login_max_attempts: int = int(os.getenv("LOGIN_MAX_ATTEMPTS", "5"))
+    login_window_seconds: int = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
     public_base_url: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
     auto_create_schema: bool = os.getenv("AUTO_CREATE_SCHEMA", "true").lower() == "true"
 
